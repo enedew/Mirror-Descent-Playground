@@ -41,9 +41,9 @@ class FunctionParser():
     def test_function(self):
         try:
             func = self.string_to_lambda()
-            # For torch, it's typical to pass tensors:
+            
             x = torch.tensor(0.5)
-            print(func(x))  # Expected to print a tensor close to 1
+            print(func(x))  
         except ValueError as err:
             print(f"Error converting string to function: {err}")
 

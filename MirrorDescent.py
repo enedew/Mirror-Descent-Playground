@@ -6,14 +6,14 @@ mirror_map_dict = {
     # domain R^n
     'EUCLID' : lambda x: x,
     # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
-    'KL' : lambda x: torch.log(x),
+    'KL' : lambda x: torch.log(x + 1e-8),
 }
 
 # dictionary of inverse mirror maps for different bregman divergences 
 
 inv_mirror_map_dict = {
     'EUCLID' : lambda x: x,
-    'KL' : lambda x: torch.exp(x) 
+    'KL' : lambda x: torch.exp(x + 1e-8) 
 }
 
 
@@ -28,7 +28,7 @@ class MirrorDescent(Optimizer):
 
         # merges model parameters and hyperparameters into a self.param_groups
         # this is a list containing the groups of model parameters and their corresponding
-        # hyperparameters, e.g. if i need different hyperparameters for different layers in the model?
+        # hyperparameters, e.g. if i need different hyperparameters for different layers in a model?
         super().__init__(params, defaults)
     
     def step(self, closure=None):
