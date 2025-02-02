@@ -31,9 +31,174 @@ a {
     
 }
 
+
+h4 { 
+    margin-bottom: 0px;
+    margin-top: 0px;
+}
+
+.settings {
+    font-family: "Roboto", serif;
+    flex: 1 1 auto;
+}
+
+.input-values {
+    width: 4vw; 
+}
+
+.input-function {
+    width: 7vw;
+}
+
+.input-row {
+    display: flex;
+    justify-content: space-between;
+    width: 90%;
+}
+
+
+
+.markdown-config{
+    font-family: "Roboto", serif;
+    text-align: center;
+    font-size: large;
+    height: 30px;
+    margin-bottom: 0px;
+    margin-right: 8vw;
+}
+
+.config-button { 
+    font-family: "Roboto", serif;
+    font-optical-sizing: auto;
+    text-decoration: none;
+    height: 100%;
+    background: none;
+    border: none;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+
+}
+
+.run-button { 
+    font-family: "Roboto", serif;
+    font-optical-sizing: auto;
+    text-decoration: none;
+    background: none; 
+    height: 5vh;
+    border: 1px solid black;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+    margin-right: 8vw;
+
+}
+.config-button:hover{
+    background-color: rgb(183, 243, 181);
+    cursor: pointer;
+}
+.run-button:hover{
+    background-color: rgb(183, 243, 181);
+    cursor: pointer;
+}
+.option-columns {
+    display: flex;
+    flex-direction: row;
+    font-size: 0.8em;
+    justify-content: space-between;
+    width: 100%;
+}
+
+#top-div-config{
+    display: flex;
+    flex-direction: row;
+    justify-content: center;     /* center them horizontally */
+    align-items: center;
+    width: 100%;                  /* same width as .option-columns for alignment */
+    margin-right: 10vw;           /* auto left/right to center in parent */
+    gap: 10px;
+}
+
+#approx-button {
+    margin-right: 2vw;
+}
+
+#bregman-input, #loss-input {
+    width: 70%;
+    
+}
+
+.Select--single > .Select-control .Select-value {
+    bottom: 0;
+    color: #aaa;
+    left: 0;
+    line-height: 11px;
+    padding-left: 10px;
+    padding-right: 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+}
+.dash-dropdown {
+    padding-bottom: 0.2vh;
+}
+.Select-input {
+    height: 20px;
+    line-height: 23px;
+}
+.Select-control {
+    height: 20px;
+    line-height: 23px;
+
+}
+.Select-placeholder {
+    line-height: 23px;
+
+}
+.Select-value-label {
+    line-height: 23px;
+}
+.Select-single {
+    line-height: 26px;
+}
+
+.configuration-options {
+    width: 30%;
+    padding: 5px;
+    
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content:flex-start;
+}
+
+.experiment-graphs {
+    width: 70%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 10px;
+}
+
+.experiment-graphs .dash-graph {
+    min-width: 0;
+    min-height: 0;
+}
+
+.experiment-div {
+    display: flex;
+    flex-direction: row;
+}
+
 a:hover {
     background-color: rgb(183, 243, 181);
 }
+
+
 
 .navbar { 
     display: flex;
