@@ -100,6 +100,22 @@ h4 {
     cursor: pointer;
 }
 
+.add-button {
+    font-family: "Roboto", serif;
+    font-optical-sizing: auto;
+    text-decoration: none;
+    background: none; 
+    border: 1px solid black;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    height: 3vh;
+    width: 3vh;
+
+}
+.add-button:hover{
+    background-color: rgb(183, 243, 181);
+    cursor: pointer;
+}
 
 .run-button { 
     font-family: "Roboto", serif;
@@ -139,7 +155,7 @@ h4 {
     margin-right: 2vw;
 }
 
-#bregman-input,  #loss-input, #var-input {
+#bregman-input-0,  #loss-input-0, #bregman-input-1,  #loss-input-1, #bregman-input-2,  #loss-input-2, #bregman-input-3,  #loss-input-3, #bregman-input-4,  #loss-input-4{
     width: 70%;
 }
 #bregman-mini-input {

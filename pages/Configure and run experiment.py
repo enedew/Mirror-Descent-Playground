@@ -14,21 +14,60 @@ There are two different types of experiments available:
 * Approximating a function with a simple regression model, using mirror descent to minimise the loss over training. 
 """
 
-model_settings = html.Div([
-    dcc.Markdown("**Model options**"),
+# constructor functions 
+def construct_md_settings(idx):
+    return html.Div([
+    dcc.Markdown(f"**Mirror Descent Options ({idx})**"),
     html.Div([
-        html.Label("Layers"),
-        dcc.Input(type="number", value=2, style={"marginBottom": "5px"}, className="input-values", id="layers-input")
+        html.Label("Batch Size"),
+        dcc.Input(type="number", value=500, style={"marginBottom": "5px"}, className="input-values", id={"type": "batch-size-input", "index": idx}),
     ], className="input-row"),
     html.Div([
-        html.Label("Neurons"),
-        dcc.Input(type="number", value=10, style={"marginBottom": "5px"}, className="input-values", id="neuron-input")
-    ], className="input-row"),
+        html.Label("Bregman"),
+        dcc.Dropdown(
+            options = [
+                {"label": "Euclidean", "value": "EUCLID"},
+                {"label": "KL", "value": "KL"}
+            ]    
+        , id={"type": "bregman-input", "index": idx},className="bregman-loss-input", value="EUCLID")
+    ], className = "input-row"),
     html.Div([
-        html.Label("Epochs"),
-        dcc.Input(type="number", value=2000, style={"marginBottom": "5px"}, className="input-values", id="epoch-input")
-    ], className="input-row"),
-], className="settings")
+        html.Label("Loss"),
+        dcc.Dropdown(
+            options = [
+                {"label": "MSE", "value": "MSE"},
+                {"label": "MAE", "value": "MAE"},
+                {"label": "Huber", "value": "Huber"}
+            ]
+        , id={"type": "loss-input", "index": idx}, className="bregman-loss-input", value="MSE")
+    ], className = "input-row"),
+    html.Div([
+        html.Label("Learning Rate"),
+        dcc.Input(type="number", value=0.01, step=0.001, min=0, style={"marginBottom": "5px"}, className="input-values", id={"type": "lr-input", "index": idx}),
+    ], className="input-row")
+    ], className="settings")
+
+
+def construct_model_settings(idx):
+    
+    return html.Div([
+                dcc.Markdown(f"**Model options ({idx})**"),
+                html.Div([
+                    html.Label("Layers"),
+                    dcc.Input(type="number", value=2, style={"marginBottom": "5px"}, className="input-values", id={"type": "layers-input", "index": idx})
+                ], className="input-row"),
+                html.Div([
+                    html.Label("Neurons"),
+                    dcc.Input(type="number", value=10, style={"marginBottom": "5px"}, className="input-values", id={"type": "neuron-input", "index": idx})
+                ], className="input-row"),
+                html.Div([
+                    html.Label("Epochs"),
+                    dcc.Input(type="number", value=2000, style={"marginBottom": "5px"}, className="input-values", id={"type": "epoch-input", "index": idx})
+                ], className="input-row"),
+            ], className="settings")
+
+  
+
 
 function_md_settings = html.Div([
     dcc.Markdown("**Function / Data values**"),
@@ -45,47 +84,9 @@ function_md_settings = html.Div([
         html.Label("Samples"),
         dcc.Input(type="number", value=500, style={"marginBottom": "5px"}, className="input-values", id="num-samples-input"),
     ], className="input-row"),
-    dcc.Markdown("**Mirror Descent Options**"),
-    html.Div([
-        html.Label("Batch Size"),
-        dcc.Input(type="number", value=500, style={"marginBottom": "5px"}, className="input-values", id="batch-size-input"),
-    ], className="input-row"),
-    html.Div([
-        html.Label("Bregman"),
-        dcc.Dropdown(
-            options = [
-                {"label": "Euclidean", "value": "EUCLID"},
-                {"label": "KL", "value": "KL"}
-            ]    
-        , id="bregman-input",className="dropdown", value="EUCLID")
-    ], className = "input-row"),
-    html.Div([
-        html.Label("Loss"),
-        dcc.Dropdown(
-            options = [
-                {"label": "MSE", "value": "MSE"},
-                {"label": "MAE", "value": "MAE"},
-                {"label": "Huber", "value": "Huber"}
-            ]
-        , id="loss-input", className="dropdown", value="MSE")
-    ], className = "input-row"),
-    html.Div([
-        html.Label("Learning Rate"),
-        dcc.Input(type="number", value=0.01, step=0.001, min=0, style={"marginBottom": "5px"}, className="input-values", id="lr-input"),
-    ], className="input-row"),
+    construct_md_settings(1)
     
 ], className="settings", id="function-md-settings")
-
-@callback(
-    Output("batch-size-input", "value"),
-    Input("num-samples-input", "value")
-)
-def update_batch_size(num_samples):
-    # assumes batch mirror descent, and automatically sets the batch size to be equal to the number of samples
-    # if user changes the batch size for mirror descent it shouldn't change back unless the sample number is changed
-    return num_samples
-
-
 
 minimise_config = html.Div([
     dcc.Markdown("**Objective function and algorithm parameters**"),
@@ -116,14 +117,11 @@ minimise_config = html.Div([
     ], className = "input-row"),
 ], className= "settings", id="minimise-config")
 
-approximate_config = html.Div([
-        model_settings,
-        function_md_settings
-    ], className="option-columns-mlp", id="approximate-config")
-
-# placeholder variable to be updated with either approximate_config or minimise_config
+# placeholder variables to be updated via callback
 experiment_settings_container = html.Div(id="experiment-settings-container", className="option-columns-mlp")
 run_button_container = html.Div(id="run-button-container")
+experiment_results = html.Div([], id="experiment-output", className="experiment-graphs")
+experiment_settings_type_store = dcc.Store(id="experiment-settings-type", data="minimise")
 
 config_options = html.Div([
     dcc.Markdown("#### Configuration", className="markdown-config"),
@@ -133,13 +131,9 @@ config_options = html.Div([
     ], id="top-div-config"),
     experiment_settings_container,
     run_button_container
-], className="configuration-options")
+], className="configuration-options", id="config-options")
 
-experiment_results = html.Div([
-    
-], id="experiment-output", className="experiment-graphs")
-
-experiment_settings_type_store = dcc.Store(id="experiment-settings-type", data="minimise")
+num_experiments_store = dcc.Store(id="num-experiments", data=1)
 
 layout = html.Div([
     dcc.Markdown(explanation_md, className="markdown", id="config-info"),
@@ -148,13 +142,51 @@ layout = html.Div([
         experiment_results
     ], className= "experiment-div"),
     experiment_settings_type_store,
+    num_experiments_store
     
 ], style={"padding": "20px"})
 
 
 minimise_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-minimise")
 approximate_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-approximate")
+minimise_add_button = html.Button("+", className="add-button", n_clicks=0, id="add-button-minimise")
+approximate_add_button = html.Button("+", className="add-button", n_clicks=0, id="add-button-approximate")
+@callback(
+        Output("config-options", "children"),
+        Output("num-experiments", "data"),
+        Input("add-button-approximate", "n_clicks"),
+        State("config-options", "children"),
+        State("num-experiments", "data"),
+        prevent_initial_call=True
+)
+def add_configuration(n_clicks, current_children, num_experiments):
+    # Only add a configuration if n_clicks is at least 1.
+    if not n_clicks:
+        return current_children
+    num_experiments += 1
+    # Construct the new settings container.
+    new_settings = html.Div(
+        [construct_model_settings(num_experiments), construct_md_settings(num_experiments)],
+        id=f"new-settings-{num_experiments}", className="option-columns-mlp"
+    )
 
+    # Assuming that run_button_container is always the last child,
+    # insert new_settings right before it.
+    updated_children = current_children[:-1] + [new_settings] + [current_children[-1]]
+    return updated_children, num_experiments
+
+
+
+
+
+@callback(
+    Output("batch-size-input", "value"),
+    Input("num-samples-input", "value")
+)
+def update_batch_size(num_samples):
+    # assumes batch mirror descent, and automatically sets the batch size to be equal to the number of samples
+    # if user changes the batch size for mirror descent it shouldn't change back unless the sample number is changed
+    return num_samples
 
 # callback triggers when either the minimise or approximate button is clicked and updates experiment_type store
 @callback(
@@ -175,7 +207,7 @@ def update_experiment_settings(approx_clicks, min_clicks):
         if button_triggered == "min-button":
             return minimise_config, "config-button", "config-button-clicked", "minimise"
         elif button_triggered == "approx-button": 
-            return [model_settings, function_md_settings], "config-button-clicked", "config-button", "approximate"
+            return [construct_model_settings(1), function_md_settings], "config-button-clicked", "config-button", "approximate"
         else:
             return minimise_config, "config-button", "config-button-clicked", "minimise"
 
@@ -186,9 +218,9 @@ def update_experiment_settings(approx_clicks, min_clicks):
 )
 def update_run_button(experiment_type):
     if experiment_type == "minimise":
-        return minimise_run_button
+        return [minimise_run_button, minimise_add_button]
     elif experiment_type == "approximate":
-        return approximate_run_button
+        return [approximate_run_button, approximate_add_button]
     else: 
         return ValueError("Unrecognised experiment type")
 
