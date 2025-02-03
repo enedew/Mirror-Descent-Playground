@@ -43,7 +43,7 @@ h4 {
 }
 
 .input-values {
-    width: 4vw; 
+    width: 4.5vw; 
 }
 
 .input-function {
@@ -139,13 +139,17 @@ h4 {
     margin-right: 2vw;
 }
 
-#bregman-input,  #loss-input {
+#bregman-input,  #loss-input, #var-input {
     width: 70%;
 }
 #bregman-mini-input {
     width: 50%;
     padding-bottom: 10px;
 }
+
+/* #lr-input, #lr-mini-input {
+    width: 20%
+} */
 .Select--single > .Select-control .Select-value {
     bottom: 0;
     color: #aaa;
@@ -207,6 +211,11 @@ h4 {
 .experiment-graphs .dash-graph {
     min-width: 0;
     min-height: 0;
+}
+
+.graph {
+    font-family: "Roboto", serif;
+    font-optical-sizing: auto;
 }
 
 .experiment-div {

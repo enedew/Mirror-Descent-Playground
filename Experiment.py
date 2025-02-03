@@ -52,48 +52,58 @@ class ExperimentMD():
         return X, Y 
 
 
-    def train_model(self, X, Y, epochs=2000):
+    def train_model(self, X, Y, batch_size, epochs=2000):
+        samples = X.shape[0]
         for epoch in range(epochs):
-            pred = self.model(X)
-            loss = self.criterion(pred, Y)
+            # shuffle indices for random mini-batches
+            shuffled_idxs = torch.randperm(samples)
+            for i in range(0, samples, batch_size):
+                # prepare the mini-batch
+                batch_idxs = shuffled_idxs[i : i+batch_size]
+                X_batch = X[batch_idxs]
+                Y_batch = Y[batch_idxs]
 
-            self.optimiser.zero_grad()
-            loss.backward()
-            
-            # record gradient norms 
-            self.calculate_record_gradient_norms()
+                pred = self.model(X_batch)
+                loss = self.criterion(pred, Y_batch)
 
-            
-            # save original parameters before stepping for bregman calculation
-            old_params = []
-            for group in self.optimiser.param_groups:
-                for param in group['params']:
-                    old_params.append(param.data.clone())
+                self.optimiser.zero_grad()
+                loss.backward()
+                
+                # record gradient norms 
+                self.calculate_record_gradient_norms()
 
-            # kept getting NaN params and predictions, implementing this stopped it but still getting
-            # the error for KL.
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=5.0)
+                
+                # save original parameters before stepping for bregman calculation
+                old_params = []
+                for group in self.optimiser.param_groups:
+                    for param in group['params']:
+                        old_params.append(param.data.clone())
 
-            self.optimiser.step()
+                # kept getting NaN params and predictions, implementing this stopped it but still getting
+                # the error for KL.
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=5.0)
 
-            for param in self.model.parameters():
-                if torch.isnan(param).any():
-                    print("WARNING: NaN detected in parameter")
+                self.optimiser.step()
 
-            
-            self.calculate_record_bregman_divergence(old_params)
-            self.loss_logs.append(loss.item())
+                for param in self.model.parameters():
+                    if torch.isnan(param).any():
+                        print("WARNING: NaN detected in parameter")
+
+                
+                self.calculate_record_bregman_divergence(old_params)
+                
 
             # calculate metrics 
             if epoch % (epochs / 10) == 0:
                 if not torch.isnan(pred).any():
+                    pred = self.model(X)
                     metrics = self.calculate_metrics(Y, pred)
                     self.metrics.append([epoch] + metrics)
                     print(f"Epoch: {epoch}, Loss: {loss.item()}")
 
                 else:
                     print("WARNING: NaN prediction values present")
-    
+            self.loss_logs.append(loss.item())
 
     def calculate_metrics(self, true, pred):
     
@@ -176,7 +186,7 @@ class ExperimentMD():
                 psi_x = psi(param)
 
                 # inner product
-                product = torch.sum(self.optimiser.grad_psi(previous) * (psi_x - psi_y))
+                product = torch.sum(self.optimiser.grad_psi(previous) * (param-previous))
 
 
                 # calculating the bregman divergence
@@ -190,7 +200,7 @@ class ExperimentMD():
         self.divergence_logs.append(avg_divergence)
 
 
-    def run_experiment_mlp(self, data_lbound, data_ubound, n_samples, layers, neurons, epochs, lr):
+    def run_experiment_mlp(self, data_lbound, data_ubound, n_samples, batch_size, layers, neurons, epochs, lr):
         # function runs an experiment to approximate a given input function using a simple multi layer perceptron with MirrorDescent as the optimiser
         # generate the data
         # this should vary on the bregman, for now just built for euclidean 
@@ -203,7 +213,7 @@ class ExperimentMD():
         self.construct_optimiser(self.model.parameters(), lr)
         print("optimiser constructed")
         # train the model 
-        self.train_model(X, Y, epochs)
+        self.train_model(X, Y, batch_size, epochs)
         print("training complete")
         # final predict 
         self.predict(X, Y)
@@ -239,13 +249,18 @@ class ExperimentMD():
             title='Optimisation Path',
             xaxis_title='x',
             yaxis_title='f(x)',
+            template="plotly_white",
+            font=dict(
+                family="Roboto",
+                color="black"
+            ),
             legend=dict(
             orientation="h",   
             yanchor="bottom",  
             y=1.02,             
             xanchor="right",   
             x=1,
-            bgcolor="rgba(255,255,255,0.5)"  
+            bgcolor="rgba(255,255,255,0.5)"
         ))
 
         return fig
@@ -262,18 +277,20 @@ class ExperimentMD():
         fig.update_layout(
             title="Loss curve",
             xaxis_title="Epochs",
-            yaxis_title="MSE Loss"
+            yaxis_title="Loss",
+            template="plotly_white",
+            font=dict(
+                family="Roboto",
+                color="black"
+            )
         )
         fig.update_yaxes(
             type="log"
         )
         return fig
     
-    def create_gradient_norm_graph(self, mini=True):
-        if mini==True:
-            xaxis = "Iteration"
-        else: 
-            xaxis = "Epoch"
+    def create_gradient_norm_graph(self):
+        xaxis="Iteration"
         fig = plotly.Figure()
         fig.add_trace(plotly.Scatter(
             x=list(range(len(self.gradient_logs))),
@@ -284,15 +301,17 @@ class ExperimentMD():
         fig.update_layout(
             title = f"Gradient Norm over {xaxis}s",
             xaxis_title = xaxis,
-            yaxis_title = "Gradient Norm"
+            yaxis_title = "Gradient Norm",
+            template="plotly_white",
+            font=dict(
+                family="Roboto",
+                color="black"
+            )
         )
         return fig
 
-    def create_divergence_graph(self, mini=True):
-        if mini==True:
-            xaxis = "Iteration"
-        else: 
-            xaxis = "Epoch"
+    def create_divergence_graph(self):
+        xaxis="Iteration"
         fig = plotly.Figure()
         fig.add_trace(plotly.Scatter(
             x = list(range(len(self.divergence_logs))),
@@ -301,10 +320,14 @@ class ExperimentMD():
             name = "bregman divergence"
         ))
         fig.update_layout(
-            title="Bregman Divergence between current and next parameters",
+            title="Bregman Divergence of parameters",
             xaxis_title=f"{xaxis}s",
-            yaxis_title="Divergence Value"
-
+            yaxis_title="Divergence Value",
+            template="plotly_white",
+            font=dict(
+                family="Roboto",
+                color="black"
+            )
         )
         return fig
 
@@ -328,6 +351,11 @@ class ExperimentMD():
             title='Function Approximation',
             xaxis_title='Input',
             yaxis_title='Output',
+            template="plotly_white",
+            font=dict(
+                family="Roboto",
+                color="black"
+            ),
             legend=dict(
             orientation="h",   
             yanchor="bottom",  
