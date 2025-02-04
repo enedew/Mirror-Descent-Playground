@@ -32,8 +32,18 @@ class ExperimentMD():
         self.minimisation_guesses = []
         self.prediction_data = {}
 
+    def clear(self):
+        # function to clear any logs for the next experiment
+        self.metrics = []
+        self.loss_logs = [] 
+        self.gradient_logs = []
+        self.divergence_logs = []
+        self.minimisation_guesses = []
+        self.prediction_data = {}
 
     def build_simple_MLP(self, layers, neurons=10):
+        # function to construct a simple MLP, taking in neurons and layers parameters
+        # (TO DO: layers)
         self.model = torch.nn.Sequential(
             torch.nn.Linear(1,neurons),
             torch.nn.ReLU(),
@@ -41,10 +51,12 @@ class ExperimentMD():
         )
 
     def construct_optimiser(self, params, lr):
+        # function to construct the optimiser from the mirror descent class
         self.optimiser = MirrorDescent(params, lr, self.bregman)
 
 
     def generate_data(self, lbound, ubound, n_samples):
+        # function to generate synthetic training data for function approximation
         X = np.linspace(lbound, ubound, n_samples).astype(np.float32) 
         Y = self.objective(torch.tensor(X)) 
         X = torch.tensor(X).unsqueeze(1)
@@ -53,6 +65,7 @@ class ExperimentMD():
 
 
     def train_model(self, X, Y, batch_size, epochs=2000):
+        # function for training the constructed model
         samples = X.shape[0]
         for epoch in range(epochs):
             # shuffle indices for random mini-batches
@@ -106,7 +119,8 @@ class ExperimentMD():
             self.loss_logs.append(loss.item())
 
     def calculate_metrics(self, true, pred):
-    
+        # function to calculate either regression or classification metrics
+        # (Classification models still need to be implemented) - currently just MLP regressor
         true = true.detach().cpu().numpy()
         pred = pred.detach().cpu().numpy()
         if self.results == 'R':
@@ -119,7 +133,7 @@ class ExperimentMD():
         return metrics
         
     def predict(self, X, Y):
-
+        # get the model to predict on a dataset
         preds_final = self.model(X)
         loss_final = self.criterion(preds_final, Y)
         final_metrics = self.calculate_metrics(preds_final, Y) 
@@ -163,8 +177,8 @@ class ExperimentMD():
         print("Iterations for minimisation complete")
     
     def calculate_record_gradient_norms(self):
+        # function calculating the euclidean norm of the gradients
         grad_norm = 0.0
-        # calculating the euclidean norm of the gradients
         for group in self.optimiser.param_groups:
             for param in group['params']:
                 if param.grad is not None: 
@@ -173,6 +187,8 @@ class ExperimentMD():
         self.gradient_logs.append(grad_norm)
 
     def calculate_record_bregman_divergence(self, old_params):
+        # function for calculating the bregman divergence between parameters of the current
+        # epoch/iteration, and the parameters after optimiser.step() is
         total_divergence = 0.0
         params = 0 
         idx = 0 

@@ -129,6 +129,9 @@ h4 {
     margin-right: 8vw;
 
 }
+
+
+
 .run-button:hover{
     background-color: rgb(183, 243, 181);
     cursor: pointer;
@@ -155,10 +158,11 @@ h4 {
     margin-right: 2vw;
 }
 
-#bregman-input-0,  #loss-input-0, #bregman-input-1,  #loss-input-1, #bregman-input-2,  #loss-input-2, #bregman-input-3,  #loss-input-3, #bregman-input-4,  #loss-input-4{
-    width: 70%;
+div[id*='"type":"bregman-input"'], div[id*='"type":"loss-input"']{
+    width: 65%;
 }
-#bregman-mini-input {
+
+div[id*='"type":"bregman-mini-input"']{
     width: 50%;
     padding-bottom: 10px;
 }
