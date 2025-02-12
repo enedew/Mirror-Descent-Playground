@@ -2,7 +2,6 @@ import dash
 from dash import dcc, html, Input, Output, callback_context, no_update
 import plotly.express as px
 
-
 app = dash.Dash(__name__, use_pages=True, suppress_callback_exceptions=True)
 
 app.index_string = """

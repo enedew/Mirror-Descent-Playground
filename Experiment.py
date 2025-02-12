@@ -150,13 +150,13 @@ class ExperimentMD():
         # minimises an objective function using the MirrorDescent optimiser
         # first convert the starting point to a tensor
         self.minimisation_guesses.append(init)
-        x = torch.tensor([float(init)], requires_grad=True)
+        x = torch.tensor(init, requires_grad=True)
         self.construct_optimiser([x], lr)
 
         print("Optimiser constructed, now starting minimisation")
         for i in range(iter):
             self.optimiser.zero_grad()
-            y = self.objective(x)
+            y = self.objective(*x)
             y.backward()
 
             # recording gradient norms
@@ -173,7 +173,7 @@ class ExperimentMD():
             # calculate and record the bregman divergence between params of this iteration and the next
             self.calculate_record_bregman_divergence(old_params)
 
-            self.minimisation_guesses.append(x.item())
+            self.minimisation_guesses.append(x.detach().cpu().numpy().copy())
         print("Iterations for minimisation complete")
     
     def calculate_record_gradient_norms(self):
@@ -233,154 +233,6 @@ class ExperimentMD():
         print("training complete")
         # final predict 
         self.predict(X, Y)
-
-
-    def create_optimisation_path_graph(self):
-        fig = plotly.Figure()
-        print(self.minimisation_guesses[:10])
-        y_values_guess = [self.objective(torch.tensor(x)) for x in self.minimisation_guesses]
-        # generating a line for the objective function
-       
-        x_line = np.linspace(min(self.minimisation_guesses)-5, max(self.minimisation_guesses)+5, 500)
-        y_line = [self.objective(torch.tensor(x)) for x in x_line]
-        fig.add_trace(plotly.Scatter(
-            x=x_line,
-            y=y_line,
-            mode='lines',
-            name='Objective Function'
-        ))
-
-
-        # plotting the guesses
-        fig.add_trace(plotly.Scatter(
-            x=self.minimisation_guesses,
-            y=y_values_guess,
-            mode="markers+lines",
-            marker=dict(size=2, color="red", symbol="circle"),
-            line=dict(color='red', width=2),
-            name="optimiser guesses"
-        ))
-
-        fig.update_layout(
-            title='Optimisation Path',
-            xaxis_title='x',
-            yaxis_title='f(x)',
-            template="plotly_white",
-            font=dict(
-                family="Roboto",
-                color="black"
-            ),
-            legend=dict(
-            orientation="h",   
-            yanchor="bottom",  
-            y=1.02,             
-            xanchor="right",   
-            x=1,
-            bgcolor="rgba(255,255,255,0.5)"
-        ))
-
-        return fig
-
-
-    def create_loss_curve(self):
-        fig = plotly.Figure()
-        fig.add_trace(plotly.Scatter(
-            x=list(range(len(self.loss_logs))),
-            y=self.loss_logs,
-            mode="lines",
-            name="Loss"
-        ))
-        fig.update_layout(
-            title="Loss curve",
-            xaxis_title="Epochs",
-            yaxis_title="Loss",
-            template="plotly_white",
-            font=dict(
-                family="Roboto",
-                color="black"
-            )
-        )
-        fig.update_yaxes(
-            type="log"
-        )
-        return fig
-    
-    def create_gradient_norm_graph(self):
-        xaxis="Iteration"
-        fig = plotly.Figure()
-        fig.add_trace(plotly.Scatter(
-            x=list(range(len(self.gradient_logs))),
-            y = self.gradient_logs,
-            mode="lines",
-            name="gradient norm"
-        ))
-        fig.update_layout(
-            title = f"Gradient Norm over {xaxis}s",
-            xaxis_title = xaxis,
-            yaxis_title = "Gradient Norm",
-            template="plotly_white",
-            font=dict(
-                family="Roboto",
-                color="black"
-            )
-        )
-        return fig
-
-    def create_divergence_graph(self):
-        xaxis="Iteration"
-        fig = plotly.Figure()
-        fig.add_trace(plotly.Scatter(
-            x = list(range(len(self.divergence_logs))),
-            y = self.divergence_logs,
-            mode = "lines",
-            name = "bregman divergence"
-        ))
-        fig.update_layout(
-            title="Bregman Divergence of parameters",
-            xaxis_title=f"{xaxis}s",
-            yaxis_title="Divergence Value",
-            template="plotly_white",
-            font=dict(
-                family="Roboto",
-                color="black"
-            )
-        )
-        return fig
-
-    def create_function_approximation_plot(self):
-        fig = plotly.Figure()
-        data = self.prediction_data
-        fig.add_trace(plotly.Scatter(
-            x=data['X'],
-            y=data['Y_true'],
-            mode='lines',
-            name='True Function'
-        ))
-        fig.add_trace(plotly.Scatter(
-            x=data['X'],
-            y=data['Y_pred'],
-            mode='markers+lines',
-            name='MLP Approximation',
-            marker=dict(size=2, opacity=0.7)
-        ))
-        fig.update_layout(
-            title='Function Approximation',
-            xaxis_title='Input',
-            yaxis_title='Output',
-            template="plotly_white",
-            font=dict(
-                family="Roboto",
-                color="black"
-            ),
-            legend=dict(
-            orientation="h",   
-            yanchor="bottom",  
-            y=1.02,             
-            xanchor="right",   
-            x=1,
-            bgcolor="rgba(255,255,255,0.5)"  
-        ))
-        return fig
 
 
 

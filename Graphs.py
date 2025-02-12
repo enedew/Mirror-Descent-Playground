@@ -189,73 +189,136 @@ class Graphs():
         else: 
             raise ValueError("approximation graph does not exist.")
         
-    def create_optimisation_path_graph(self, minimisation_guesses, objective):
+    def create_optimisation_path_graph(self, minimisation_guesses, objective, dim ):
         self.optimisation_path_graph = plotly.Figure()
         print(minimisation_guesses[:10])
-        y_values_guess = [objective(torch.tensor(x)) for x in minimisation_guesses]
+        
         # generating a line for the objective function
-       
-        x_line = np.linspace(min(minimisation_guesses)-5, max(minimisation_guesses)+5, 500)
-        y_line = [objective(torch.tensor(x)) for x in x_line]
-        self.optimisation_path_graph.add_trace(plotly.Scatter(
-            x=x_line,
-            y=y_line,
-            mode='lines',
-            opacity=0.7,
-            name='Objective Function',
-            line=dict(color="black")
-        ))
+
+        if dim == 1: 
+            y_values_guess = [objective(torch.tensor(x)) for x in minimisation_guesses]
+            x_line = np.linspace(min(minimisation_guesses)-5, max(minimisation_guesses)+5, 500)
+            y_line = [objective(torch.tensor(x)) for x in x_line]
+            self.optimisation_path_graph.add_trace(plotly.Scatter(
+                x=x_line,
+                y=y_line,
+                mode='lines',
+                opacity=0.4,
+                name='Objective Function',
+                line=dict(color="black")
+            ))
 
 
-        # plotting the guesses
-        self.optimisation_path_graph.add_trace(plotly.Scatter(
-            x=minimisation_guesses,
-            y=y_values_guess,
-            mode="markers+lines",
-            marker=dict(size=2, color=self.line_colors[1], symbol="circle"),
-            line=dict(color=self.line_colors[1], width=2),
-            name="(1)",
-            opacity=0.5
-        ))
+            # plotting the guesses
+            self.optimisation_path_graph.add_trace(plotly.Scatter(
+                x=minimisation_guesses,
+                y=y_values_guess,
+                mode="markers+lines",
+                marker=dict(size=2, color=self.line_colors[1], symbol="circle"),
+                line=dict(color=self.line_colors[1], width=2),
+                name="(1)",
+                opacity=0.5
+            ))
 
-        self.optimisation_path_graph.update_layout(
-            title='Optimisation Path',
-            xaxis_title='x',
-            yaxis_title='f(x)',
-            template="plotly_white",
-            font=dict(
-                family="Roboto",
-                color="black"
-            ),
-            legend=dict(
-            orientation="h",   
-            yanchor="bottom",  
-            y=1.02,             
-            xanchor="right",   
-            x=1,
-            bgcolor="rgba(255,255,255,0.5)"
-        ))
+            self.optimisation_path_graph.update_layout(
+                title='Optimisation Path',
+                xaxis_title='x',
+                yaxis_title='f(x)',
+                template="plotly_white",
+                font=dict(
+                    family="Roboto",
+                    color="black"
+                ),
+                legend=dict(
+                orientation="h",   
+                yanchor="bottom",  
+                y=1.02,             
+                xanchor="right",   
+                x=1,
+                bgcolor="rgba(255,255,255,0.5)"
+            ))
+        else: 
+
+            x_range = np.linspace(-50, 50, 200)
+            y_range = np.linspace(-50, 50, 200)
+            X, Y = np.meshgrid(x_range, y_range)
+            Z = np.array([[objective(torch.tensor(x), torch.tensor(y)) for x, y in zip(X_row, Y_row)] for X_row, Y_row in zip(X, Y)])
+
+            
+            x_vals = [p[0] for p in minimisation_guesses]
+            y_vals = [p[1] for p in minimisation_guesses]
+            
+            self.optimisation_path_graph.add_trace(plotly.Contour(
+                x=x_range,
+                y=y_range,
+                z=Z,
+                colorscale='greys',
+                contours=dict(showlabels=True, labelfont=dict(size=10)),
+                hoverinfo='none'
+            ))
+
+            
+            self.optimisation_path_graph.add_trace(plotly.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode='lines+markers',
+                line=dict(color=self.line_colors[1], width=1),
+                marker=dict(size=2, color=self.line_colors[1], symbol='circle'),
+                name="(1)"
+            ))
+
+          
+            self.optimisation_path_graph.update_layout(
+                title='Optimisation Path',
+                xaxis_title='x',
+                yaxis_title='f(x)',
+                template="plotly_white",
+                font=dict(
+                    family="Roboto",
+                    color="black"
+                ),
+                legend=dict(
+                orientation="h",   
+                yanchor="bottom",  
+                y=1.02,             
+                xanchor="right",   
+                x=1,
+                bgcolor="rgba(255,255,255,0.5)"
+            ))
 
         return self.optimisation_path_graph
     
-    def add_optimisation_path(self, minimisation_guesses, objective, exp_number):
+    def add_optimisation_path(self, minimisation_guesses, objective, exp_number, dim ):
         print("!")
-        y_values_guess = [objective(torch.tensor(x)) for x in minimisation_guesses]
-        print("?")
-        self.optimisation_path_graph.add_trace(plotly.Scatter(
-            x=minimisation_guesses,
-            y=y_values_guess,
-            mode="markers+lines",
-            marker=dict(size=2, color=self.line_colors[exp_number], symbol="circle"),
-            line=dict(color=self.line_colors[exp_number], width=2),
-            name=f"({exp_number})",
-            opacity=0.5
-        ))
+        if dim == 1: 
+            y_values_guess = [objective(torch.tensor(x)) for x in minimisation_guesses]
+            print("?")
+            self.optimisation_path_graph.add_trace(plotly.Scatter(
+                x=minimisation_guesses,
+                y=y_values_guess,
+                mode="markers+lines",
+                marker=dict(size=2, color=self.line_colors[exp_number], symbol="circle"),
+                line=dict(color=self.line_colors[exp_number], width=2),
+                name=f"({exp_number})",
+                opacity=0.5
+            ))
+        else: 
+            x_vals = [p[0] for p in minimisation_guesses]
+            y_vals = [p[1] for p in minimisation_guesses]
+            self.optimisation_path_graph.add_trace(plotly.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode='lines+markers',
+                line=dict(color=self.line_colors[exp_number], width=1),
+                marker=dict(size=2, color=self.line_colors[exp_number], symbol='circle'),
+                name=f"({exp_number})"
+            ))
+
 
         return self.optimisation_path_graph
         
-    def update_all_graphs_min(self, minimisation_guesses, gradient_logs, divergence_logs, objective, exp_number):
-        updated_optimisation = self.add_optimisation_path(minimisation_guesses=minimisation_guesses, objective=objective, exp_number=exp_number)
+    def update_all_graphs_min(self, minimisation_guesses, gradient_logs, divergence_logs, objective, exp_number, dim):
+        updated_optimisation = self.add_optimisation_path(minimisation_guesses=minimisation_guesses, objective=objective, exp_number=exp_number, dim=dim)
         updated_gradient =self.add_gradient_norm(gradient_logs=gradient_logs, exp_number=exp_number)
         updated_divergence = self.add_divergence(divergence_logs=divergence_logs, exp_number=exp_number)
         return updated_optimisation, updated_gradient, updated_divergence

@@ -71,8 +71,12 @@ def construct_mini_settings(idx):
     return html.Div([
     dcc.Markdown(f"**Algorithm parameters ({idx})**"),
     html.Div([
-        html.Label("Initial value"),
+        html.Label("Initial value (X)"),
         dcc.Input(type="number", value=0.5, style={"marginBottom": "5px"}, className="input-values", id={"type": "initial-value-input", "index" : idx}),
+    ], className="input-row"),
+    html.Div([
+        html.Label("Initial value (Y)"),
+        dcc.Input(type="number", value=0.5, style={"marginBottom": "5px"}, className="input-values", id={"type": "initial-value-input-2", "index" : idx}),
     ], className="input-row"),
     html.Div([
         html.Label("Iterations"),
@@ -91,14 +95,14 @@ def construct_mini_settings(idx):
             ]    
         , id={"type": "bregman-mini-input", "index" : idx},className="dropdown", value="EUCLID")
     ], className = "input-row")
-    ], className="settings")
+    ], className="settings", id={"type": "minimise-settings", "index" : idx})
 
 
 function_md_settings = html.Div([
     dcc.Markdown("**Function / Data values**"),
     html.Div([
         html.Label("Function"),
-        dcc.Input(type="text", value="X**2 + 3*X", style={"marginBottom": "5px"}, className="input-function", id="function-input")
+        dcc.Input(type="text", value="X**2 + Y**2", style={"marginBottom": "5px"}, className="input-function", id="function-input")
     ], className="input-row"),
     html.Div([
         html.Label("Input range"),
@@ -117,7 +121,11 @@ minimise_config = html.Div([html.Div([
     dcc.Markdown("**Objective function and algorithm parameters**"),
     html.Div([
         html.Label("Objective Function"),
-        dcc.Input(type="text", value="X**2 + 3*X", style={"marginBottom": "5px"}, className="input-function", id="function-mini-input"),
+        dcc.Input(type="text", value="X**2 + Y**2", style={"marginBottom": "5px"}, className="input-function", id="function-mini-input"),
+    ], className="input-row"),
+    html.Div([
+        html.Label("Variables"),
+        dcc.Input(type="number", value=1, step=1, min=1, max=2, style={"marginBottom": "5px"}, className="input-values", id="num-variables-input"),
     ], className="input-row"),
     construct_mini_settings(1)
 ], className= "settings", id="minimise-config")], id="experiment-settings-container", className="option-columns-mlp")
@@ -128,7 +136,7 @@ approx_config = html.Div([
 
 
 # placeholder variables to be updated via callback
-experiment_settings_container = html.Div(id="experiment-settings-container", className="option-columns-mlp")
+experiment_settings_container = minimise_config
 run_button_container = html.Div(id="run-button-container")
 experiment_results = html.Div([], id="experiment-output", className="experiment-graphs")
 experiment_settings_type_store = dcc.Store(id="experiment-settings-type", data="minimise")
@@ -137,7 +145,7 @@ config_options = html.Div([
     dcc.Markdown("#### Configuration", className="markdown-config"),
     html.Div([
         html.Button("Approximate", className="config-button", id="approx-button", n_clicks=0),
-        html.Button("Minimise",   className="config-button", id="min-button",   n_clicks=0)
+        html.Button("Minimise",   className="config-button-clicked", id="min-button",   n_clicks=0)
     ], id="top-div-config"),
     experiment_settings_container,
     run_button_container
@@ -170,7 +178,20 @@ approximate_run_button = html.Button("Run Experiment", className="run-button", n
 minimise_add_button = html.Button("+", className="add-button", n_clicks=1, id="add-button-minimise")
 approximate_add_button = html.Button("+", className="add-button", n_clicks=1, id="add-button-approximate")
 
+@callback(
+    Output({"type": "initial-value-input-2", "index" : ALL}, "disabled"),
+    Input("function-mini-input", "value"),
+    State("num-experiments-min", "data")
+)
+def update_initial_value_input(func, num_experiments):
+    
+    if ("Y" in func.upper()) and ("X" in func.upper()):
+        return [False]*num_experiments
+    else: 
+        return [True]*num_experiments
 
+
+# Callback to add another experiment configuration when running an approximation experiment
 @callback(
         Output("config-options", "children"),
         Output("num-experiments-approx", "data"),
@@ -202,6 +223,7 @@ def add_configuration_approx(n_clicks, current_children, num_experiments, experi
     
     return updated_children, num_experiments
 
+# callback to add another configuration when running a minimisation experiment
 @callback(
         Output("config-options", "children", allow_duplicate=True),
         Output("num-experiments-min", "data", allow_duplicate=True),
@@ -228,17 +250,18 @@ def add_configuration_mini(n_clicks, current_children, num_experiments, experime
     
     return updated_children, num_experiments
 
-
+# assumes batch mirror descent, and automatically sets the batch size to be equal to the number of samples
+# if user changes the batch size for mirror descent it shouldn't change back unless the sample number is changed
 @callback(
     Output("batch-size-input", "value"),
     Input("num-samples-input", "value")
 )
 def update_batch_size(num_samples):
-    # assumes batch mirror descent, and automatically sets the batch size to be equal to the number of samples
-    # if user changes the batch size for mirror descent it shouldn't change back unless the sample number is changed
     return num_samples
 
+
 # callback triggers when either the minimise or approximate button is clicked and updates experiment_type store
+# also makes sure to remove any extra configurations that have been added for the previous type of experiment
 @callback(
     Output("config-options", "children", allow_duplicate=True),
     Output("approx-button", "className"),
@@ -289,6 +312,7 @@ def update_experiment_settings(approx_clicks, min_clicks, current_children, g_ap
             return new_children_mini, "config-button", "config-button-clicked", "minimise", g_approx_clicks, g_min_clicks, 1, 1
 
 
+# updates which run button (approx or minimise) to display based on the experiment type store
 @callback(
     Output("run-button-container", "children"),
     Input("experiment-settings-type", "data"),
@@ -301,7 +325,8 @@ def update_run_button(experiment_type):
     else: 
         return ValueError("Unrecognised experiment type")
 
-
+# run an approximation experiment, taking in single or multiple experiment configurations
+# overlays the graphs to directly compare results immediately
 @callback(
     Output("experiment-output", "children", allow_duplicate=True),
     Output("run-button-approximate", "n_clicks"),
@@ -376,27 +401,42 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, function, range_min, r
 
         
         
-
+# run a minimisation experiment, taking in single or multiple experiment configurations
+# overlays the graphs to directly compare results immediately
 @callback(
     Output("experiment-output", "children"),
     Output("run-button-minimise", "n_clicks"),
     Input("run-button-minimise", "n_clicks"),
     State("function-mini-input", "value"),
     State({"type": "initial-value-input", "index": ALL}, "value"),
+    State({"type": "initial-value-input-2", "index": ALL}, "value"),
     State({"type": "number-iterations-input", "index": ALL}, "value"),
     State({"type": "lr-mini-input", "index": ALL}, "value"),
     State({"type": "bregman-mini-input", "index": ALL}, "value"),
     State("num-experiments-min", "data"),
+    State({"type": "initial-value-input-2", "index": ALL}, "disabled"),
     prevent_initial_call=True,
     allow_duplicate=True,
     suppress_callback_exceptions=True
     
 )
-def run_experiment_minimise(n_clicks, objective_string, init, iter, lr, bregman, num_experiments):
+def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter, lr, bregman, num_experiments, second_input_bool):
     if n_clicks != 0:
         # parse objective function from string 
+        print(second_input_bool)
+        if second_input_bool[0]==False:
+            inits = [[float(x), float(y)] for x, y in zip(init_x, init_y)]
+            print("?")
+            dim = 2
+            test = [1, 2]
+        else: 
+            inits = [float(x) for x in init_x]
+            dim = 1
+            test = 1
+        print(inits)
+        print(init_y)
         parser = FunctionParser(objective_string)
-        parser.test_function()
+        
         objective = parser.string_to_lambda()
 
         # instantiate experiment object
@@ -405,22 +445,21 @@ def run_experiment_minimise(n_clicks, objective_string, init, iter, lr, bregman,
 
         # run experiment, generate and return figures
         print(experiment.objective)
-        experiment.run_experiment_minimise(init[0], iter[0], float(lr[0]))
+        experiment.run_experiment_minimise(inits[0], iter[0], float(lr[0]))
         print("experiment complete")
 
         # instantiate the graph class
         graph = Graphs()
 
-        optimisation_path_fig = graph.create_optimisation_path_graph(experiment.minimisation_guesses, experiment.objective)
+        optimisation_path_fig = graph.create_optimisation_path_graph(experiment.minimisation_guesses, experiment.objective, dim)
         gradient_fig = graph.create_gradient_norm_graph(experiment.gradient_logs)
         divergence_fig = graph.create_divergence_graph(experiment.divergence_logs)
 
         for i in range(1, num_experiments):
             experiment.clear()
             experiment.bregman = bregman[i]
-            experiment.run_experiment_minimise(init[i], iter[i], float(lr[i]))
-            optimisation_path_fig, gradient_fig, divergence_fig = graph.update_all_graphs_min(experiment.minimisation_guesses, experiment.gradient_logs,
-                                                                                               experiment.divergence_logs, experiment.objective, i+1)
+            experiment.run_experiment_minimise(inits[i], iter[i], float(lr[i]))
+            optimisation_path_fig, gradient_fig, divergence_fig = graph.update_all_graphs_min(experiment.minimisation_guesses, experiment.gradient_logs,experiment.divergence_logs, experiment.objective, i+1, dim)
 
         n_clicks = 0
         return [dcc.Graph(figure=optimisation_path_fig, id="optimisation-path-fig", config={'responsive': True},className="graph"),
