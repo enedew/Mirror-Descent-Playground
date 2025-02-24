@@ -1,34 +1,95 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
 
+:root{
+    --bg: #e8dac5;
+    --la: #a9b756;
+    --mc: #6c6a72;
+    --da: #737181;
+    --ds: #322634;
+}
+
+body{
+    background-color: var(--bg);
+    margin: 0;
+}
+
+.navbar { 
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    height: 5vh;
+    text-align: center;
+    background: var(--mc);
+}
 
 .headers {
     font-family: "Roboto", serif;
     font-optical-sizing: auto;
-    font-weight: 300;
+    font-weight: 500;
+    padding-top: 1vh;
     font-style: normal;
     text-align: center;
+    background-color: var(--mc);
+    color: var(--ds);
+    margin: 0;
 }
 
-.markdown {
+.info-page-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 10px;
+}
+
+.markdown-desc {
     font-family: "Roboto", serif;
+    background-color: var(--da);
     font-optical-sizing: auto;
-    font-weight: 350;
+    font-weight: 400;
     margin: auto;
+    margin-top: 3vh;
     max-width: 80%;
+    color: var(--ds);
+    padding-left: 1vw;
+    padding-right: 1vw;
+}
+
+.markdown-algo {
+    font-family: "Roboto", serif;
+    background-color: var(--da);
+    font-optical-sizing: auto;
+    font-weight: 400;
+    margin: auto;
+    margin-top: 3vh;
+    margin-right: 8vw;
+    width: 90%;
+    color: var(--ds);
+    padding-left: 1vw;
+    padding-right: 1vw;
+    
+}
+
+.navlinks-active {
+    background-color: var(--la);
 }
 
 a {
     font-family: "Roboto", serif;
     font-optical-sizing: auto;
     text-decoration: none;
-    font-weight: 350;
-    color: rgb(0, 0, 0);
+    font-weight: 450;
+    color: var(--ds);
     padding: 8px 10px;
     margin-right: 12px;
     
     border-radius: 5px;
     transition: all 0.3s ease;
     
+}
+
+a:hover {
+    background-color: var(--la);
 }
 
 
@@ -57,14 +118,23 @@ h4 {
 }
 
 
+#config-info{
+    background: #f5f5f5;
+    padding: 5px;
+    padding-bottom: 2px;
+    margin-bottom: 5px;
+    border: 1px solid black; 
+    border-radius: 5px;
+ 
+}
 
 .markdown-config{
     font-family: "Roboto", serif;
     text-align: center;
     font-size: large;
+    color: var(--ds);
     height: 30px;
     margin-bottom: 0px;
-    margin-right: 8vw;
 }
 
 .config-button { 
@@ -138,6 +208,7 @@ h4 {
 }
 .option-columns-mlp {
     display: flex;
+    margin-left: 2vw;
     flex-direction: row;
     font-size: 0.8em;
     justify-content: space-between;
@@ -150,7 +221,6 @@ h4 {
     justify-content: center;     /* center them horizontally */
     align-items: center;
     width: 100%;                  /* same width as .option-columns for alignment */
-    margin-right: 10vw;           /* auto left/right to center in parent */
     gap: 10px;
 }
 
@@ -212,7 +282,9 @@ div[id*='"type":"bregman-mini-input"']{
 .configuration-options {
     width: 30%;
     padding: 5px;
-    
+    background: #f5f5f5;
+    border: 1px solid black;
+    border-radius: 5px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -243,18 +315,6 @@ div[id*='"type":"bregman-mini-input"']{
     flex-direction: row;
 }
 
-a:hover {
-    background-color: rgb(183, 243, 181);
-}
 
 
 
-.navbar { 
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    height: 5vh;
-    text-align: center;
-    background: #f5f5f5;
-}

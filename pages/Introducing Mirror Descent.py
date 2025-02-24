@@ -32,9 +32,18 @@ x_{k+1} = \nabla\phi^*(y_{k+1})
 $$
 """
 
+algo_markdown = r"""
+### The Algorithm 
+Given a convex function $f$ to optimise, a learning rate $\alpha_k$, initial point $x_0$, and 
+a distance-generating function $\phi$, with $\nabla\phi$ as the mirror map
+Starting from initial $x_0$, in each iteration: 
+* Map to the dual space: y_k \from \nabla
+
+"""
+
 
 layout = html.Div([
-    
-    dcc.Markdown(mirror_descent_markdown, mathjax=True, className="markdown")
-])
+    dcc.Markdown(mirror_descent_markdown, mathjax=True, className="markdown-desc"),
+    dcc.Markdown(algo_markdown, mathjax=True, className="markdown-algo")
+], className="info-page-layout")
 
