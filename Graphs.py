@@ -18,8 +18,8 @@ class Graphs():
 
     
     def create_loss_curve(self, loss_logs):
-        fig = plotly.Figure()
-        fig.add_trace(plotly.Scatter(
+        self.interactive_bregman_plot = plotly.Figure()
+        self.interactive_bregman_plot.add_trace(plotly.Scatter(
             x=list(range(len(loss_logs))),
             y=loss_logs,
             mode="lines",
@@ -27,7 +27,7 @@ class Graphs():
             line=dict(color=self.line_colors[1]),
             name="1"
         ))
-        fig.update_layout(
+        self.interactive_bregman_plot.update_layout(
             title="Loss curve",
             xaxis_title="Epochs",
             yaxis_title="Loss",
@@ -37,10 +37,10 @@ class Graphs():
                 color="black"
             )
         )
-        fig.update_yaxes(
+        self.interactive_bregman_plot.update_yaxes(
             type="log"
         )
-        self.loss_curve_graph = fig 
+        self.loss_curve_graph = self.interactive_bregman_plot 
         return self.loss_curve_graph 
     
    
@@ -60,8 +60,8 @@ class Graphs():
 
     def create_gradient_norm_graph(self, gradient_logs):
         xaxis="Iteration"
-        fig = plotly.Figure()
-        fig.add_trace(plotly.Scatter(
+        self.interactive_bregman_plot = plotly.Figure()
+        self.interactive_bregman_plot.add_trace(plotly.Scatter(
             x=list(range(len(gradient_logs))),
             y = gradient_logs,
             mode="lines",
@@ -69,7 +69,7 @@ class Graphs():
             opacity=0.7,
             line=dict(color=self.line_colors[1]),
         ))
-        fig.update_layout(
+        self.interactive_bregman_plot.update_layout(
             title = f"Gradient Norm over {xaxis}s",
             xaxis_title = xaxis,
             yaxis_title = "Gradient Norm",
@@ -79,7 +79,7 @@ class Graphs():
                 color="black"
             )
         )
-        self.gradient_norm_graph = fig 
+        self.gradient_norm_graph = self.interactive_bregman_plot 
         return self.gradient_norm_graph
     
     def add_gradient_norm(self, gradient_logs, exp_number):
@@ -99,8 +99,8 @@ class Graphs():
     
     def create_divergence_graph(self, divergence_logs):
         xaxis="Iteration"
-        fig = plotly.Figure()
-        fig.add_trace(plotly.Scatter(
+        self.interactive_bregman_plot = plotly.Figure()
+        self.interactive_bregman_plot.add_trace(plotly.Scatter(
             x = list(range(len(divergence_logs))),
             y = divergence_logs,
             opacity=0.7,
@@ -108,7 +108,7 @@ class Graphs():
             name = "1",
             line=dict(color=self.line_colors[1])
         ))
-        fig.update_layout(
+        self.interactive_bregman_plot.update_layout(
             title="Bregman Divergence of parameters",
             xaxis_title=f"{xaxis}s",
             yaxis_title="Divergence Value",
@@ -118,7 +118,7 @@ class Graphs():
                 color="black"
             )
         )
-        self.divergence_graph = fig 
+        self.divergence_graph = self.interactive_bregman_plot 
         return self.divergence_graph 
     
     def add_divergence(self, divergence_logs, exp_number): 
@@ -137,15 +137,15 @@ class Graphs():
         
     
     def create_function_approximation_plot(self, prediction_data):
-        fig = plotly.Figure()
-        fig.add_trace(plotly.Scatter(
+        self.interactive_bregman_plot = plotly.Figure()
+        self.interactive_bregman_plot.add_trace(plotly.Scatter(
             x=prediction_data['X'],
             y=prediction_data['Y_true'],
             mode='lines',
             name='True Function',
             line=dict(color="black")
         ))
-        fig.add_trace(plotly.Scatter(
+        self.interactive_bregman_plot.add_trace(plotly.Scatter(
             x=prediction_data['X'],
             y=prediction_data['Y_pred'],
             mode='markers+lines',
@@ -154,7 +154,7 @@ class Graphs():
             line=dict(color=self.line_colors[1]),
             marker=dict(size=2, opacity=0.5)
         ))
-        fig.update_layout(
+        self.interactive_bregman_plot.update_layout(
             title='Function Approximation',
             xaxis_title='Input',
             yaxis_title='Output',
@@ -171,7 +171,7 @@ class Graphs():
             x=1,
             bgcolor="rgba(255,255,255,0.5)"  
         ))
-        self.approximation_graph = fig 
+        self.approximation_graph = self.interactive_bregman_plot 
         return self.approximation_graph 
     
     def add_function_approximation(self, prediction_data, exp_number): 
@@ -316,6 +316,125 @@ class Graphs():
 
 
         return self.optimisation_path_graph
+    
+    def create_interactive_bregman_graph(self, x, y):
+        def phi(x):
+            return x**2
+    
+        def grad_phi(x):
+            return 2*x
+
+        # Create x values for plotting
+        x_vals = np.linspace(-2, 2, 400)
+    
+        # Calculate phi(x) for all x
+        phi_vals = phi(x_vals)
+        # Calculate the Taylor expansion at y for all x: T(x; y)=phi(y)+phi'(y)(x-y)
+        taylor = phi(y) + grad_phi(y) * (x_vals - y)
+        
+        # Calculate the values at the selected evaluation point x_sel
+        phi_x_sel = phi(x)
+        taylor_x_sel = phi(y) + grad_phi(y) * (x - y)
+        
+        # Create the Plotly figure and add traces
+        self.interactive_bregman_plot = plotly.Figure()
+        
+        # Plot phi(x)
+        self.interactive_bregman_plot.add_trace(plotly.Scatter(
+            x=x_vals, y=phi_vals,
+            name=r"$\phi$",
+            mode='lines',
+            line=dict(color=self.line_colors[2])
+            
+        ))
+        
+        # Plot the tangent line (Taylor expansion at y)
+        self.interactive_bregman_plot.add_trace(plotly.Scatter(
+            x=x_vals, y=taylor,
+            name=r"$\nabla\phi(y)$",
+            mode='lines',
+            line=dict(color=self.line_colors[1])
+            
+        ))
+        
+        # Mark the expansion point on phi(x)
+        self.interactive_bregman_plot.add_trace(plotly.Scatter(
+            x=[y], y=[phi(y)],
+            mode='markers',
+            name=r"$\phi(y)$",
+            marker=dict(color=self.line_colors[1], size=10),
+           
+        ))
+        
+        # Mark the selected evaluation point on phi(x)
+        self.interactive_bregman_plot.add_trace(plotly.Scatter(
+            x=[x], y=[phi_x_sel],
+            name=r"$\phi(x)$",
+            mode='markers',
+            marker=dict(color=self.line_colors[2], size=10),
+          
+        ))
+        
+        # Mark the corresponding point on the tangent line
+        self.interactive_bregman_plot.add_trace(plotly.Scatter(
+            x=[x], y=[taylor_x_sel],
+            name=r"$\langle \nabla\phi(y), x-y \rangle$",
+            mode='markers',
+            marker=dict(color=self.line_colors[3], size=10),
+            
+        ))
+        
+        # Draw a vertical line connecting the function value and its tangent at x_sel
+        self.interactive_bregman_plot.add_trace(plotly.Scatter(
+            x=[x, x],
+            y=[taylor_x_sel, phi_x_sel],
+            mode='lines',
+            line=dict(color='black', dash='dash'),
+            name=r'$\mathbb{D}_{\phi}(x, y)$'
+        ))
+        
+        # Update the layout of the figure
+        self.interactive_bregman_plot.update_layout(
+            xaxis_title='x',
+            yaxis_title='Value',
+            template='plotly_white',
+            font=dict(
+                size=10,
+                color="#322634"
+            ),
+            legend=dict(
+                font=dict(
+                    size=18,
+                    color="#322634"
+                ),
+                entrywidth=150,
+                orientation="h",
+                y=1.01,
+                x=0,
+                yanchor="bottom",
+                bgcolor="#f2e9dd",
+
+            ),
+            plot_bgcolor= "#f2e9dd",
+            paper_bgcolor = "#f2e9dd",
+            
+            margin=dict(t=70, l=50, r=50, b=50)
+        )
+
+        self.interactive_bregman_plot.update_xaxes(
+            gridcolor= "#e8dac5",
+            linecolor= "#322634",
+            zerolinecolor="#e8dac5"
+        )
+
+        self.interactive_bregman_plot.update_yaxes(
+            gridcolor= "#e8dac5",
+            linecolor= "#322634",
+            zerolinecolor="#e8dac5"
+
+        )
+        
+        return self.interactive_bregman_plot
         
     def update_all_graphs_min(self, minimisation_guesses, gradient_logs, divergence_logs, objective, exp_number, dim):
         updated_optimisation = self.add_optimisation_path(minimisation_guesses=minimisation_guesses, objective=objective, exp_number=exp_number, dim=dim)

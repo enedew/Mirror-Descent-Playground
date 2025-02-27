@@ -10,11 +10,6 @@ app.index_string = """
 <head>
     <title>Mirror Descent & Bregman Divergences</title>
     <!-- Load MathJax 3 from a CDN -->
-    <script
-      type="text/javascript"
-      async
-      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"
-    ></script>
     {%css%}
 </head>
 <body>

@@ -4,7 +4,7 @@
     --bg: #e8dac5;
     --la: #a9b756;
     --mc: #6c6a72;
-    --da: #737181;
+    --da: #f2e9dd;
     --ds: #322634;
 }
 
@@ -37,37 +37,89 @@ body{
 
 .info-page-layout {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: 1fr;
     grid-template-rows: auto auto;
-    gap: 10px;
-}
-
-.markdown-desc {
+    gap: 5px;
     font-family: "Roboto", serif;
-    background-color: var(--da);
     font-optical-sizing: auto;
     font-weight: 400;
-    margin: auto;
-    margin-top: 3vh;
-    max-width: 80%;
     color: var(--ds);
-    padding-left: 1vw;
-    padding-right: 1vw;
 }
 
-.markdown-algo {
+.mirror-desc {
+    font-family: "Roboto", serif;
+    background-color: var(--da);
+    font-optical-sizing: auto;
+    font-weight: 400;
+    margin: 3vh auto auto auto;
+    width: 85%;
+    color: var(--ds);
+    
+}
+
+.padding-markdown {
+    padding: 0 0 1vw 1vw;
+}
+
+.bregman-visual {
+    display: grid;
+    grid-template-columns: 1fr 2fr;  
+    width: 85%;    
+    gap: 5px;
+    margin: auto auto auto auto;
+    box-sizing: border-box;
+    
+
+    
+    
+}
+
+.bregman-desc {
     font-family: "Roboto", serif;
     background-color: var(--da);
     font-optical-sizing: auto;
     font-weight: 400;
     margin: auto;
-    margin-top: 3vh;
-    margin-right: 8vw;
+    margin-left: 0;
+    margin-top: 0;
     width: 90%;
     color: var(--ds);
-    padding-left: 1vw;
-    padding-right: 1vw;
+    padding: 0;
+    margin: 0
     
+    
+}
+
+.bregman-graph-interactive {
+    background-color: var(--da);
+    width: 100%;
+    
+    margin: 0
+
+}
+
+.rc-slider-track, .rc-slider-dot, .rc-slider-dot-active, .rc-slider-mark,.rc-slider-step, .rc-slider-handle, .rc-slider-rail {
+    background-color: var(--mc);
+    border-color: var(--ds);
+    color: var(--mc);
+}
+
+.rc-slider-handle:hover, .rc-slider-handle-click-focused:focus  {
+    border-color: var(--la);
+}
+
+.bregman-slider {
+    width: 100%;
+}
+
+.bregman-sliders {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+}
+
+.bregman-example-inputs {
+    text-align: center;
 }
 
 .navlinks-active {
