@@ -91,7 +91,9 @@ def construct_mini_settings(idx):
         dcc.Dropdown(
             options = [
                 {"label": "Euclidean", "value": "EUCLID"},
-                {"label": "KL", "value": "KL"}
+                {"label": "KL", "value": "KL"},
+                {"label": "Mahalanobis", "value": "MAHALANOBIS"},
+                {"label": "Itakura-Saito", "value": "ITAKURA-SAITO"}
             ]    
         , id={"type": "bregman-mini-input", "index" : idx},className="dropdown", value="EUCLID")
     ], className = "input-row")

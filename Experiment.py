@@ -20,10 +20,17 @@ class ExperimentMD():
             "MAE" : torch.nn.L1Loss(),
             "Huber" : torch.nn.HuberLoss()
         }
+        # matrix for mahalanobis distance
+        self.Q = torch.tensor([[2.0, 0.0],
+                  [0.0, 1.0]])
+        self.Q_inv = torch.tensor([[0.5, 0.0],
+                            [0.0, 1.0]])  
         self.dgfs = {
             'EUCLID' : lambda x: 0.5 * torch.sum(x**2),
             # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
             'KL' : lambda x: torch.sum((x+1e-8) * torch.log(x +1e-8)),
+            'MAHALANOBIS': lambda x: 0.5 * torch.sum(x * (self.Q @ x)),
+            'ITAKURA-SAITO': lambda x: -torch.sum(torch.log(x + 1e-8))
         }
         self.metrics = []
         self.loss_logs = [] 

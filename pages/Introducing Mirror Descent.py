@@ -54,14 +54,14 @@ $$
 
 
 layout = html.Div([
-    # First row: full-width markdown for mirror descent
+    # first row div - description of the mirror descent algorithm 
     html.Div([
         dcc.Markdown(mirror_descent_markdown, mathjax=True,className="padding-markdown")
     ], className="mirror-desc"),
 
-    # Second row: two equally sized columns
+    # second row div - two columns for explaining bregmans and a visualisation
     html.Div([
-        # Left column: Markdown algo_markdown and sliders
+        # first column, description and sliders
         html.Div([
             dcc.Markdown(algo_markdown, mathjax=True, className="padding-markdown"),
             html.Div([
@@ -90,7 +90,7 @@ layout = html.Div([
             ], className="bregman-sliders")
         ], className="bregman-desc"),
 
-        # Right column: the graph
+        # second column - graph visualisation of bregmans
         html.Div([
             dcc.Markdown("### Visualising the Bregman Divergence for the Euclidean norm $\phi=||x||^2$ (squared Euclidean distance)", mathjax=True, className="padding-markdown"),
             dcc.Graph(
@@ -100,7 +100,13 @@ layout = html.Div([
                 mathjax=True
             )
         ], className="bregman-graph-interactive")
-    ], className="bregman-visual")
+    ], className="bregman-visual"),
+
+    html.Div([
+
+    ], className="mirror-map-visualisation")
+
+
 ], className="info-page-layout")
 
 @callback(
