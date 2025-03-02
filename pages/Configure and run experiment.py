@@ -136,15 +136,15 @@ minimise_config = html.Div([html.Div([
         dcc.Input(type="number", value=1, step=1, min=1, max=2, style={"marginBottom": "5px"}, className="input-values", id="num-variables-input"),
     ], className="input-row"),
     construct_mini_settings(1)
-], className= "settings", id="minimise-config")], id="experiment-settings-container", className="option-columns-mlp")
+], className= "settings", id="inner-div")], id="minimise-config", className="option-columns-mlp")
 
 approx_config = html.Div([
                     construct_model_settings(1), function_md_settings],
-                id="experiment-settings-container", className="option-columns-mlp")
+                id="approx-config", className="option-columns-mlp hidden")
 
 
 # placeholder variables to be updated via callback
-experiment_settings_container = minimise_config
+
 run_button_container = html.Div(id="run-button-container")
 experiment_results = html.Div([], id="experiment-output", className="experiment-graphs")
 experiment_settings_type_store = dcc.Store(id="experiment-settings-type", data="minimise")
@@ -155,7 +155,8 @@ config_options = html.Div([
         html.Button("Approximate", className="config-button", id="approx-button", n_clicks=0),
         html.Button("Minimise",   className="config-button-clicked", id="min-button",   n_clicks=0)
     ], id="top-div-config"),
-    experiment_settings_container,
+    minimise_config,
+    approx_config,
     run_button_container
 ], className="configuration-options", id="config-options")
 
@@ -312,6 +313,8 @@ def update_batch_size(num_samples):
     Output("min-clicks", "data"),
     Output("num-experiments-min", "data", allow_duplicate=True),
     Output("num-experiments-approx", "data", allow_duplicate=True),
+    Output("minimise-config", "className"),
+    Output("approx-config", "className"),
     Input("approx-button", "n_clicks"),
     Input("min-button", "n_clicks"),
     State("config-options", "children"),
@@ -327,11 +330,11 @@ def update_experiment_settings(approx_clicks, min_clicks, current_children, g_ap
     print("update_experiment_settings ran")
     context = callback_context
     
-    new_children_mini = current_children[:2] + [minimise_config] + [current_children[-1]]
-    new_children_approx = current_children[:2] + [approx_config] + [current_children[-1]]
+    new_children_mini = current_children[:2] + [minimise_config, approx_config] + [current_children[-1]]
+    new_children_approx = current_children[:2] + [minimise_config, approx_config] + [current_children[-1]]
     if not context.triggered:
         
-        return new_children_mini, "config-button", "config-button-clicked", "minimise", g_approx_clicks, g_min_clicks, 1, 1
+        return new_children_mini, "config-button", "config-button-clicked", "minimise", g_approx_clicks, g_min_clicks, 1, 1, "option-columns-mlp", "option-columns-mlp hidden"
     else:
         # find which button was clicked then update accordingly
         button_triggered = context.triggered[0]["prop_id"].split(".")[0]
@@ -339,18 +342,18 @@ def update_experiment_settings(approx_clicks, min_clicks, current_children, g_ap
             if min_clicks == g_min_clicks:
                 return no_update
             g_min_clicks = min_clicks
-            return new_children_mini, "config-button", "config-button-clicked", "minimise",g_approx_clicks, g_min_clicks, 1, 1
+            return new_children_mini, "config-button", "config-button-clicked", "minimise",g_approx_clicks, g_min_clicks, 1, 1, "option-columns-mlp", "option-columns-mlp hidden"
         elif button_triggered == "approx-button": 
             if approx_clicks == g_approx_clicks:
                 return no_update
             
             g_approx_clicks = approx_clicks
-            return new_children_approx, "config-button-clicked", "config-button", "approximate", g_approx_clicks, g_min_clicks, 1, 1
+            return new_children_approx, "config-button-clicked", "config-button", "approximate", g_approx_clicks, g_min_clicks, 1, 1, "option-columns-mlp hidden", "option-columns-mlp"
         else:
             if approx_clicks == g_approx_clicks:
                 return no_update
             g_min_clicks = min_clicks
-            return new_children_mini, "config-button", "config-button-clicked", "minimise", g_approx_clicks, g_min_clicks, 1, 1
+            return new_children_mini, "config-button", "config-button-clicked", "minimise", g_approx_clicks, g_min_clicks, 1, 1, "option-columns-mlp", "option-columns-mlp hidden"
 
 
 # updates which run button (approx or minimise) to display based on the experiment type store
