@@ -157,6 +157,7 @@ class ExperimentMD():
         # minimises an objective function using the MirrorDescent optimiser
         # first convert the starting point to a tensor
         self.minimisation_guesses.append(init)
+        print(init)
         x = torch.tensor(init, requires_grad=True)
         self.construct_optimiser([x], lr)
 

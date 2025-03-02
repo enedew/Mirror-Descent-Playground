@@ -13,7 +13,7 @@ mirror_map_dict = {
     'EUCLID' : lambda x: x,
     'MAHALANOBIS': lambda x: torch.matmul(Q, x),
     # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
-    'KL' : lambda x: torch.log(x + 1e-8),
+    'KL' : lambda x: torch.log(x + 1e-8) + 1,
     'ITAKURA-SAITO': lambda x: -1.0/x
 }
 
@@ -22,7 +22,7 @@ mirror_map_dict = {
 inv_mirror_map_dict = {
     'EUCLID' : lambda x: x,
     'MAHALANOBIS': lambda x: torch.matmul(Q_inv, x),
-    'KL' : lambda x: torch.exp(x + 1e-8),
+    'KL' : lambda x: torch.exp(x-1),
     'ITAKURA-SAITO': lambda x: -1.0/x 
 }
 

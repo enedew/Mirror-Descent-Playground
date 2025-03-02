@@ -15,11 +15,12 @@ class Graphs():
             4 : "#F17105", 
             5 : "#E6C229",
         }
+        self.trajectories = [] 
 
     
     def create_loss_curve(self, loss_logs):
-        self.interactive_bregman_plot = plotly.Figure()
-        self.interactive_bregman_plot.add_trace(plotly.Scatter(
+        self.loss_curve_graph = plotly.Figure()
+        self.loss_curve_graph.add_trace(plotly.Scatter(
             x=list(range(len(loss_logs))),
             y=loss_logs,
             mode="lines",
@@ -27,7 +28,7 @@ class Graphs():
             line=dict(color=self.line_colors[1]),
             name="1"
         ))
-        self.interactive_bregman_plot.update_layout(
+        self.loss_curve_graph.update_layout(
             title="Loss curve",
             xaxis_title="Epochs",
             yaxis_title="Loss",
@@ -35,12 +36,25 @@ class Graphs():
             font=dict(
                 family="Roboto",
                 color="black"
-            )
+            ),
+            plot_bgcolor="#f2e9dd",
+            paper_bgcolor="#f2e9dd"
         )
-        self.interactive_bregman_plot.update_yaxes(
+        self.loss_curve_graph.update_yaxes(
             type="log"
         )
-        self.loss_curve_graph = self.interactive_bregman_plot 
+        self.loss_curve_graph.update_xaxes(
+        gridcolor= "#e8dac5",
+        linecolor= "#322634",
+        zerolinecolor="#e8dac5"
+        )
+
+        self.loss_curve_graph.update_yaxes(
+            gridcolor= "#e8dac5",
+            linecolor= "#322634",
+            zerolinecolor="#e8dac5"
+
+        )
         return self.loss_curve_graph 
     
    
@@ -60,8 +74,8 @@ class Graphs():
 
     def create_gradient_norm_graph(self, gradient_logs):
         xaxis="Iteration"
-        self.interactive_bregman_plot = plotly.Figure()
-        self.interactive_bregman_plot.add_trace(plotly.Scatter(
+        self.gradient_norm_graph = plotly.Figure()
+        self.gradient_norm_graph.add_trace(plotly.Scatter(
             x=list(range(len(gradient_logs))),
             y = gradient_logs,
             mode="lines",
@@ -69,7 +83,7 @@ class Graphs():
             opacity=0.7,
             line=dict(color=self.line_colors[1]),
         ))
-        self.interactive_bregman_plot.update_layout(
+        self.gradient_norm_graph.update_layout(
             title = f"Gradient Norm over {xaxis}s",
             xaxis_title = xaxis,
             yaxis_title = "Gradient Norm",
@@ -77,9 +91,22 @@ class Graphs():
             font=dict(
                 family="Roboto",
                 color="black"
-            )
+            ),
+            plot_bgcolor="#f2e9dd",
+            paper_bgcolor="#f2e9dd"
         )
-        self.gradient_norm_graph = self.interactive_bregman_plot 
+        self.gradient_norm_graph.update_xaxes(
+        gridcolor= "#e8dac5",
+        linecolor= "#322634",
+        zerolinecolor="#e8dac5"
+        )
+
+        self.gradient_norm_graph.update_yaxes(
+            gridcolor= "#e8dac5",
+            linecolor= "#322634",
+            zerolinecolor="#e8dac5"
+
+        )
         return self.gradient_norm_graph
     
     def add_gradient_norm(self, gradient_logs, exp_number):
@@ -99,8 +126,8 @@ class Graphs():
     
     def create_divergence_graph(self, divergence_logs):
         xaxis="Iteration"
-        self.interactive_bregman_plot = plotly.Figure()
-        self.interactive_bregman_plot.add_trace(plotly.Scatter(
+        self.divergence_graph = plotly.Figure()
+        self.divergence_graph.add_trace(plotly.Scatter(
             x = list(range(len(divergence_logs))),
             y = divergence_logs,
             opacity=0.7,
@@ -108,7 +135,7 @@ class Graphs():
             name = "1",
             line=dict(color=self.line_colors[1])
         ))
-        self.interactive_bregman_plot.update_layout(
+        self.divergence_graph.update_layout(
             title="Bregman Divergence of parameters",
             xaxis_title=f"{xaxis}s",
             yaxis_title="Divergence Value",
@@ -116,9 +143,22 @@ class Graphs():
             font=dict(
                 family="Roboto",
                 color="black"
-            )
+            ),
+            plot_bgcolor="#f2e9dd",
+            paper_bgcolor="#f2e9dd"
         )
-        self.divergence_graph = self.interactive_bregman_plot 
+        self.divergence_graph.update_xaxes(
+        gridcolor= "#e8dac5",
+        linecolor= "#322634",
+        zerolinecolor="#e8dac5"
+        )
+
+        self.divergence_graph.update_yaxes(
+            gridcolor= "#e8dac5",
+            linecolor= "#322634",
+            zerolinecolor="#e8dac5"
+
+        )
         return self.divergence_graph 
     
     def add_divergence(self, divergence_logs, exp_number): 
@@ -137,15 +177,15 @@ class Graphs():
         
     
     def create_function_approximation_plot(self, prediction_data):
-        self.interactive_bregman_plot = plotly.Figure()
-        self.interactive_bregman_plot.add_trace(plotly.Scatter(
+        self.approximation_graph = plotly.Figure()
+        self.approximation_graph.add_trace(plotly.Scatter(
             x=prediction_data['X'],
             y=prediction_data['Y_true'],
             mode='lines',
             name='True Function',
             line=dict(color="black")
         ))
-        self.interactive_bregman_plot.add_trace(plotly.Scatter(
+        self.approximation_graph.add_trace(plotly.Scatter(
             x=prediction_data['X'],
             y=prediction_data['Y_pred'],
             mode='markers+lines',
@@ -154,7 +194,7 @@ class Graphs():
             line=dict(color=self.line_colors[1]),
             marker=dict(size=2, opacity=0.5)
         ))
-        self.interactive_bregman_plot.update_layout(
+        self.approximation_graph.update_layout(
             title='Function Approximation',
             xaxis_title='Input',
             yaxis_title='Output',
@@ -169,9 +209,22 @@ class Graphs():
             y=1.02,             
             xanchor="right",   
             x=1,
-            bgcolor="rgba(255,255,255,0.5)"  
-        ))
-        self.approximation_graph = self.interactive_bregman_plot 
+            ),
+            plot_bgcolor="#f2e9dd",
+            paper_bgcolor="#f2e9dd"  
+        )
+        self.approximation_graph.update_xaxes(
+            gridcolor= "#e8dac5",
+            linecolor= "#322634",
+            zerolinecolor="#e8dac5"
+        )
+
+        self.approximation_graph.update_yaxes(
+            gridcolor= "#e8dac5",
+            linecolor= "#322634",
+            zerolinecolor="#e8dac5"
+
+        )
         return self.approximation_graph 
     
     def add_function_approximation(self, prediction_data, exp_number): 
@@ -191,6 +244,7 @@ class Graphs():
         
     def create_optimisation_path_graph(self, minimisation_guesses, objective, dim ):
         self.optimisation_path_graph = plotly.Figure()
+        self.trajectories.append(minimisation_guesses)
         print(minimisation_guesses[:10])
         
         # generating a line for the objective function
@@ -224,7 +278,6 @@ class Graphs():
                 title='Optimisation Path',
                 xaxis_title='x',
                 yaxis_title='f(x)',
-                template="plotly_white",
                 font=dict(
                     family="Roboto",
                     color="black"
@@ -235,16 +288,20 @@ class Graphs():
                 y=1.02,             
                 xanchor="right",   
                 x=1,
-                bgcolor="rgba(255,255,255,0.5)"
-            ))
+                ),
+                plot_bgcolor="#f2e9dd",
+                paper_bgcolor="#f2e9dd"
+            )
         else: 
 
-            x_range = np.linspace(-50, 50, 200)
-            y_range = np.linspace(-50, 50, 200)
-            X, Y = np.meshgrid(x_range, y_range)
-            Z = np.array([[objective(torch.tensor(x), torch.tensor(y)) for x, y in zip(X_row, Y_row)] for X_row, Y_row in zip(X, Y)])
+            x_bounds, y_bounds = self.compute_dynamic_range(self.trajectories, padding_ratio=0.2)
+            x_range = np.linspace(x_bounds[0], x_bounds[1], 200)
+            y_range = np.linspace(y_bounds[0], y_bounds[1])
 
-            
+            X, Y = np.meshgrid(x_range, y_range)
+
+            Z = np.array([[objective(torch.tensor(x), torch.tensor(y)) for x, y in zip(X_row, Y_row)] for X_row, Y_row in zip(X, Y)])
+                
             x_vals = [p[0] for p in minimisation_guesses]
             y_vals = [p[1] for p in minimisation_guesses]
             
@@ -283,8 +340,23 @@ class Graphs():
                 y=1.02,             
                 xanchor="right",   
                 x=1,
-                bgcolor="rgba(255,255,255,0.5)"
-            ))
+                ),
+                plot_bgcolor="#f2e9dd",
+                paper_bgcolor="#f2e9dd"
+            )
+
+        self.optimisation_path_graph.update_xaxes(
+        gridcolor= "#e8dac5",
+        linecolor= "#322634",
+        zerolinecolor="#e8dac5"
+        )
+
+        self.optimisation_path_graph.update_yaxes(
+            gridcolor= "#e8dac5",
+            linecolor= "#322634",
+            zerolinecolor="#e8dac5"
+
+        )
 
         return self.optimisation_path_graph
     
@@ -303,6 +375,7 @@ class Graphs():
                 opacity=0.5
             ))
         else: 
+            self.trajectories.append(minimisation_guesses)
             x_vals = [p[0] for p in minimisation_guesses]
             y_vals = [p[1] for p in minimisation_guesses]
             self.optimisation_path_graph.add_trace(plotly.Scatter(
@@ -313,6 +386,7 @@ class Graphs():
                 marker=dict(size=2, color=self.line_colors[exp_number], symbol='circle'),
                 name=f"({exp_number})"
             ))
+            self.update_contour(objective)
 
 
         return self.optimisation_path_graph
@@ -435,6 +509,41 @@ class Graphs():
         )
         
         return self.interactive_bregman_plot
+    
+    def compute_dynamic_range(self, trajectories, padding_ratio=0.2, default_range=(-1,1)):
+        # function to compute the range of contour values dynamically each time a new trajectory is added
+        points = [p for traject in trajectories for p in traject]
+        if not points:
+            return default_range, default_range
+        
+        x_vals = [p[0] for p in points]
+        y_vals = [p[1] for p in points]
+
+        x_min, x_max = min(x_vals), max(x_vals)
+        y_min, y_max = min(y_vals), max(y_vals)
+
+        # ensuring non-zero range
+        if x_min == x_max:
+            x_min, x_max = default_range
+        if y_min == y_max:
+            y_min, y_max = default_range
+        
+        padding_x = (x_max - x_min) * padding_ratio
+        padding_y = (y_max - y_min) * padding_ratio
+        
+        return (x_min -padding_x, x_max + padding_x), (y_min - padding_y, y_max + padding_y) 
+    
+    def update_contour(self, objective):
+        # function for dynamically re-computing the plotly contour for additional trajectories
+        x_bounds, y_bounds = self.compute_dynamic_range(self.trajectories, padding_ratio=0.2)
+        x_range = np.linspace(x_bounds[0], x_bounds[1], 200)
+        y_range = np.linspace(y_bounds[0], y_bounds[1])
+
+        X, Y = np.meshgrid(x_range, y_range)
+
+        Z = np.array([[objective(torch.tensor(x), torch.tensor(y)) for x, y in zip(X_row, Y_row)] for X_row, Y_row in zip(X, Y)])
+
+        self.optimisation_path_graph.data[0].update(x=x_range, y=y_range, z=Z)
         
     def update_all_graphs_min(self, minimisation_guesses, gradient_logs, divergence_logs, objective, exp_number, dim):
         updated_optimisation = self.add_optimisation_path(minimisation_guesses=minimisation_guesses, objective=objective, exp_number=exp_number, dim=dim)

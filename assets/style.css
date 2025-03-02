@@ -2,7 +2,7 @@
 
 :root{
     --bg: #e8dac5;
-    --la: #a9b756;
+    --la: #a2bab2;
     --mc: #6c6a72;
     --da: #f2e9dd;
     --ds: #322634;
@@ -46,6 +46,10 @@ body{
     color: var(--ds);
 }
 
+p {
+    margin: 0;
+}
+
 .mirror-desc {
     font-family: "Roboto", serif;
     background-color: var(--da);
@@ -53,6 +57,8 @@ body{
     font-weight: 400;
     margin: 3vh auto auto auto;
     width: 85%;
+    border-radius: 3px;
+
     color: var(--ds);
     
 }
@@ -82,15 +88,98 @@ body{
     width: 90%;
     color: var(--ds);
     padding: 0;
+    margin: 0;
+    border-radius: 3px;
+}
+.experiment-page-toprow {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    grid-template-rows: auto
+}
+
+.experiment-desc {
+    background: var(--da);
+    font-family: "Roboto", serif;
+    color: var(--ds);
+    background-color: var(--da);
+    border-radius: 5px;
+    padding-top: 1vh;
+    margin-right: 1vw;
+    margin-bottom: 0.5vh;
+}
+
+.loading-div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto;
+}
+
+.load-experiments {
+    background: var(--da);
+    font-family: "Roboto", serif;
+    color: var(--ds);
+    background-color: var(--da);
+    border-radius: 5px;
+    padding-top: 1vh;
+    margin-bottom: 0.5vh;
+}
+
+.preset-load{ 
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: center;
+    border-right: 2px solid var(--ds);
+}
+
+.upload-load {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+}
+
+.upload {
+    border: dashed 1px var(--ds);
+    padding: 1vh 1vw 1vh 1vw;
+    background-color: #fff7ed;
+    border-radius: 3px;
+}
+
+.upload:hover{
+    cursor: pointer;
+}
+
+.load-button {
+    background: var(--da);
+    font-family: "Roboto", serif;
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--ds);
+    background-color: #fff7ed;
+    border: none;
+    border-radius: 3px;
+    width: 4vw;
+    height: 23px;
+    align-self: center;
+}
+
+.load-button:hover {
+    background-color: var(--la);
+    cursor: pointer;
+}
+
+#drag-drop-md {
     margin: 0
-    
-    
+}
+
+#preset-dropdown {
+    width: 7vw;
 }
 
 .bregman-graph-interactive {
     background-color: var(--da);
     width: 100%;
-    
+    border-radius: 3px;
     margin: 0
 
 }
@@ -100,6 +189,7 @@ body{
     width: 85%;
     height: 30vh; 
 }
+
 
 .rc-slider-track, .rc-slider-dot, .rc-slider-dot-active, .rc-slider-mark,.rc-slider-step, .rc-slider-handle, .rc-slider-rail {
     background-color: var(--mc);
@@ -155,15 +245,20 @@ h4 {
 
 .settings {
     font-family: "Roboto", serif;
+    color: var(--ds);
     flex: 1 1 auto;
 }
 
 .input-values {
     width: 4.5vw; 
+    background-color: #fff7ed;
+    border: none;
 }
 
 .input-function {
     width: 8vw;
+    background-color: #fff7ed;
+    border: none;
 }
 
 .input-row {
@@ -173,15 +268,7 @@ h4 {
 }
 
 
-#config-info{
-    background: #f5f5f5;
-    padding: 5px;
-    padding-bottom: 2px;
-    margin-bottom: 5px;
-    border: 1px solid black; 
-    border-radius: 5px;
- 
-}
+
 
 .markdown-config{
     font-family: "Roboto", serif;
@@ -196,6 +283,7 @@ h4 {
     font-family: "Roboto", serif;
     font-optical-sizing: auto;
     text-decoration: none;
+    font-size: 1em;
     height: 100%;
     background: none;
     border: none;
@@ -208,57 +296,101 @@ h4 {
     font-family: "Roboto", serif;
     font-optical-sizing: auto;
     text-decoration: none;
+    font-size: 1em;
     height: 100%;
-    background-color: rgb(183, 243, 181);
-    border: 1px solid black;
-    border-radius: 5px;
+    background-color: var(--la);
+    border: none;
+    border-radius: 2px;
     transition: all 0.3s ease;
 
 }
 
 .config-button:hover{
-    background-color: rgb(183, 243, 181);
+    background-color: var(--la);
     cursor: pointer;
 }
 .config-button-clicked:hover{
-    background-color: rgb(183, 243, 181);
+    background-color: var(--la);
     cursor: pointer;
+}
+
+.save-button {
+    font-family: "Roboto", serif;
+    font-optical-sizing: auto;
+    text-decoration: none;
+    font-weight: 800;
+    background-color: #fff7ed;
+    font-size: 1em;
+    color: var(--ds);
+    border: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    height: 3.5vh;
+    width: 3vw;
+    padding-bottom: 1px;
+    margin-right: 1vw;
+}
+.save-button:hover{
+    background-color: var(--la);
+    cursor: pointer;
+}
+
+.save-button:disabled{
+    background-color: #b4b1be
+}
+
+.save-button:disabled:hover{
+    background-color: #b4b1be;
+    cursor: default;
 }
 
 .add-button {
     font-family: "Roboto", serif;
     font-optical-sizing: auto;
     text-decoration: none;
-    background: none; 
-    border: 1px solid black;
+    font-weight: 800;
+    font-size: 1.25em;
+    background-color: #fff7ed; 
+    color: var(--ds);
+    border: none;
     border-radius: 10px;
     transition: all 0.3s ease;
-    height: 3vh;
-    width: 3vh;
+    height: 3.5vh;
+    width: 2vw;
+    padding-bottom: 1px;
+    margin-right: 1vw;
 
 }
+
 .add-button:hover{
-    background-color: rgb(183, 243, 181);
+    background-color: var(--la);
     cursor: pointer;
 }
 
 .run-button { 
     font-family: "Roboto", serif;
     font-optical-sizing: auto;
+    font-weight: 700;
     text-decoration: none;
-    background: none; 
-    height: 5vh;
-    border: 1px solid black;
+    background-color: #fff7ed; 
+    color: var(--ds);
+    font-size: 1em;
+    height: 3.5vh;
+    border: none;
     border-radius: 5px;
     transition: all 0.3s ease;
-    margin-right: 8vw;
+    margin-right: 1vw;
 
 }
 
-
+#run-button-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
 
 .run-button:hover{
-    background-color: rgb(183, 243, 181);
+    background-color: var(--la);
     cursor: pointer;
 }
 .option-columns-mlp {
@@ -275,6 +407,7 @@ h4 {
     flex-direction: row;
     justify-content: center;     /* center them horizontally */
     align-items: center;
+    margin-bottom: 1vh;
     width: 100%;                  /* same width as .option-columns for alignment */
     gap: 10px;
 }
@@ -285,6 +418,7 @@ h4 {
 
 div[id*='"type":"bregman-input"'], div[id*='"type":"loss-input"']{
     width: 65%;
+    
 }
 
 div[id*='"type":"bregman-mini-input"']{
@@ -292,9 +426,8 @@ div[id*='"type":"bregman-mini-input"']{
     padding-bottom: 10px;
 }
 
-/* #lr-input, #lr-mini-input {
-    width: 20%
-} */
+
+
 .Select--single > .Select-control .Select-value {
     bottom: 0;
     color: #aaa;
@@ -313,7 +446,9 @@ div[id*='"type":"bregman-mini-input"']{
 }
 .dash-dropdown {
     padding-bottom: 0.2vh;
+    
 }
+
 .Select-input {
     height: 20px;
     line-height: 23px;
@@ -321,11 +456,23 @@ div[id*='"type":"bregman-mini-input"']{
 .Select-control {
     height: 20px;
     line-height: 23px;
+    background-color: #fff7ed;
+    border: none;
 
+}
+.input-values::-webkit-inner-spin-button, 
+.input-values::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
 }
 .Select-placeholder {
     line-height: 23px;
+    background-color: #fff7ed;
 
+}
+
+.hidden {
+    display:none !important;
 }
 .Select-value-label {
     line-height: 23px;
@@ -333,15 +480,26 @@ div[id*='"type":"bregman-mini-input"']{
 .Select-single {
     line-height: 26px;
 }
+.Select-menu-outer {
+    background-color: #fff7ed;
+}
+.Select-multi-value-wrapper {
+    background-color: #fff7ed;
+
+}
+.Select-clear-zone, .Select-arrow-zone {
+    background-color: #fff7ed;
+}
 
 .configuration-options {
     width: 30%;
     padding: 5px;
-    background: #f5f5f5;
-    border: 1px solid black;
+    background: var(--da);
     border-radius: 5px;
     display: flex;
     flex-direction: column;
+    margin-right: 1vw;
+    align-self: flex-start;
     align-items: center;
     justify-content:flex-start;
 }
@@ -368,6 +526,12 @@ div[id*='"type":"bregman-mini-input"']{
 .experiment-div {
     display: flex;
     flex-direction: row;
+}
+
+.graph {
+    padding: 5px;
+    background-color: var(--da);
+    border-radius: 5px;
 }
 
 

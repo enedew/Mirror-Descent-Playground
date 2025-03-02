@@ -15,6 +15,12 @@ There are two different types of experiments available:
 * Approximating a function with a simple regression model, using mirror descent to minimise the loss over training. 
 """
 
+loading_md = r"""
+### Loading experiments
+There are several pre-configured experiments which you can load. Alternatively you have the option to save experiments after running,
+and upload the configuration to run again.
+"""
+
 # constructor functions 
 def construct_md_settings(idx):
     return html.Div([
@@ -104,7 +110,7 @@ function_md_settings = html.Div([
     dcc.Markdown("**Function / Data values**"),
     html.Div([
         html.Label("Function"),
-        dcc.Input(type="text", value="X**2 + Y**2", style={"marginBottom": "5px"}, className="input-function", id="function-input")
+        dcc.Input(type="text", value="X**2 + 3*X", style={"marginBottom": "5px"}, className="input-function", id="function-input")
     ], className="input-row"),
     html.Div([
         html.Label("Input range"),
@@ -161,7 +167,37 @@ global_min_clicks_store = dcc.Store(id="min-clicks", data=0)
 
 
 layout = html.Div([
-    dcc.Markdown(explanation_md, className="markdown", id="config-info"),
+    html.Div([
+        html.Div([
+            dcc.Markdown(explanation_md, className="padding-markdown")
+        ], className="experiment-desc"),
+        html.Div([
+            dcc.Markdown(loading_md, className="padding-markdown"),
+            html.Div([
+                html.Div([
+                    dcc.Dropdown(
+                    options = [
+                        {"label": "Euclidean", "value": "EUCLID"},
+                        {"label": "KL", "value": "KL"},
+                        {"label": "Mahalanobis", "value": "MAHALANOBIS"},
+                        {"label": "Itakura-Saito", "value": "ITAKURA-SAITO"}
+                    ]    
+                , id="preset-dropdown",className="dropdown", value="EUCLID"),
+                html.Button("Load", className="load-button", id="preset-load")
+                ], className="preset-load"),
+                html.Div([
+                    dcc.Upload([
+                        html.Div([
+                            dcc.Markdown("**Drag and Drop** or **Select File**", id="drag-drop-md")
+
+                        ], className="uploading-box")
+                    ], className="upload", id="upload-config", multiple=False, accept=".json"),
+                    html.Button("Load", className="load-button", id="upload-load")
+                ], className="upload-load")               
+            ], className="loading-div")
+        ], className="load-experiments")
+    ], className="experiment-page-toprow")
+    ,
     html.Div([
         config_options,
         experiment_results
@@ -177,8 +213,11 @@ layout = html.Div([
 
 minimise_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-minimise")
 approximate_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-approximate")
-minimise_add_button = html.Button("+", className="add-button", n_clicks=1, id="add-button-minimise")
-approximate_add_button = html.Button("+", className="add-button", n_clicks=1, id="add-button-approximate")
+minimise_add_button = html.Button("+", className="add-button", n_clicks=1, id="add-button-minimise", title="add a configuration")
+approximate_add_button = html.Button("+", className="add-button", n_clicks=1, id="add-button-approximate", title="add a configuration")
+minimise_save_button = html.Button("Save", className="save-button", id="save-button-minimise", disabled=True, title="Cannot save until experiment has ran")
+approximate_save_button = html.Button("Save", className="save-button", id="save-button-approximate", disabled=True,  title="Cannot save until experiment has ran")
+
 
 @callback(
     Output({"type": "initial-value-input-2", "index" : ALL}, "disabled"),
@@ -321,9 +360,9 @@ def update_experiment_settings(approx_clicks, min_clicks, current_children, g_ap
 )
 def update_run_button(experiment_type):
     if experiment_type == "minimise":
-        return [minimise_run_button, minimise_add_button]
+        return [minimise_run_button, minimise_add_button, minimise_save_button]
     elif experiment_type == "approximate":
-        return [approximate_run_button, approximate_add_button]
+        return [approximate_run_button, approximate_add_button, approximate_save_button]
     else: 
         return ValueError("Unrecognised experiment type")
 
@@ -332,6 +371,7 @@ def update_run_button(experiment_type):
 @callback(
     Output("experiment-output", "children", allow_duplicate=True),
     Output("run-button-approximate", "n_clicks"),
+    Output("save-button-approximate", "disabled"),
     Input("run-button-approximate", "n_clicks"),
     State({"type": "layers-input", "index": ALL}, "value"),
     State({"type": "neuron-input", "index": ALL}, "value"),
@@ -397,7 +437,7 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, function, range_min, r
         return [dcc.Graph(figure=loss_fig, id="loss-curve", config={'responsive': True},className="graph"),
                 dcc.Graph(figure=gradient_fig, id="gradient-fig",config={'responsive': True}, className="graph"),
                 dcc.Graph(figure=divergence_fig, id="divergence-fig",config={'responsive': True}, className="graph"),
-                dcc.Graph(figure=results_fig, id="results_fig",config={'responsive': True}, className="graph")], 0
+                dcc.Graph(figure=results_fig, id="results_fig",config={'responsive': True}, className="graph")], 0, False
     else: 
         return no_update
 
@@ -408,6 +448,7 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, function, range_min, r
 @callback(
     Output("experiment-output", "children"),
     Output("run-button-minimise", "n_clicks"),
+    Output("save-button-minimise", "disabled"), 
     Input("run-button-minimise", "n_clicks"),
     State("function-mini-input", "value"),
     State({"type": "initial-value-input", "index": ALL}, "value"),
@@ -426,6 +467,8 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter, lr
     if n_clicks != 0:
         # parse objective function from string 
         print(second_input_bool)
+        print(f"inputted initials {init_x} {init_y}")
+        
         if second_input_bool[0]==False:
             inits = [[float(x), float(y)] for x, y in zip(init_x, init_y)]
             print("?")
@@ -466,11 +509,10 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter, lr
         n_clicks = 0
         return [dcc.Graph(figure=optimisation_path_fig, id="optimisation-path-fig", config={'responsive': True},className="graph"),
                 dcc.Graph(figure=gradient_fig, id="gradient-fig",config={'responsive': True}, className="graph"),
-                dcc.Graph(figure=divergence_fig, id="divergence-fig",config={'responsive': True}, className="graph")], 0 
+                dcc.Graph(figure=divergence_fig, id="divergence-fig",config={'responsive': True}, className="graph")], 0, False
     
     else:
         return no_update
-
 
 
 
