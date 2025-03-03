@@ -309,7 +309,7 @@ class Graphs():
                 x=x_range,
                 y=y_range,
                 z=Z,
-                colorscale='greys',
+                colorscale=[[0,"#f2e9dd"], [1,"#52432f"]],
                 contours=dict(showlabels=True, labelfont=dict(size=10)),
                 hoverinfo='none'
             ))
@@ -398,22 +398,22 @@ class Graphs():
         def grad_phi(x):
             return 2*x
 
-        # Create x values for plotting
         x_vals = np.linspace(-2, 2, 400)
     
-        # Calculate phi(x) for all x
+        # getting all phi(x) 
         phi_vals = phi(x_vals)
-        # Calculate the Taylor expansion at y for all x: T(x; y)=phi(y)+phi'(y)(x-y)
+
+        # taylor expansion at y for all x
         taylor = phi(y) + grad_phi(y) * (x_vals - y)
         
-        # Calculate the values at the selected evaluation point x_sel
+        # calculate values at evaluation point
         phi_x_sel = phi(x)
         taylor_x_sel = phi(y) + grad_phi(y) * (x - y)
         
-        # Create the Plotly figure and add traces
+       
         self.interactive_bregman_plot = plotly.Figure()
         
-        # Plot phi(x)
+        # phi(x) plot
         self.interactive_bregman_plot.add_trace(plotly.Scatter(
             x=x_vals, y=phi_vals,
             name=r"$\phi$",
@@ -422,7 +422,7 @@ class Graphs():
             
         ))
         
-        # Plot the tangent line (Taylor expansion at y)
+        # tangent line
         self.interactive_bregman_plot.add_trace(plotly.Scatter(
             x=x_vals, y=taylor,
             name=r"$\nabla\phi(y)$",
@@ -431,7 +431,7 @@ class Graphs():
             
         ))
         
-        # Mark the expansion point on phi(x)
+        # marking the expansion point on phi(x)
         self.interactive_bregman_plot.add_trace(plotly.Scatter(
             x=[y], y=[phi(y)],
             mode='markers',
@@ -440,7 +440,7 @@ class Graphs():
            
         ))
         
-        # Mark the selected evaluation point on phi(x)
+        # marking the evaluation point on phi(X)
         self.interactive_bregman_plot.add_trace(plotly.Scatter(
             x=[x], y=[phi_x_sel],
             name=r"$\phi(x)$",
@@ -449,7 +449,7 @@ class Graphs():
           
         ))
         
-        # Mark the corresponding point on the tangent line
+        # corresponding point on the taylor approximation line
         self.interactive_bregman_plot.add_trace(plotly.Scatter(
             x=[x], y=[taylor_x_sel],
             name=r"$\langle \nabla\phi(y), x-y \rangle$",
@@ -458,7 +458,7 @@ class Graphs():
             
         ))
         
-        # Draw a vertical line connecting the function value and its tangent at x_sel
+        # vertical line connecting the points (the bregman divergence between x and y)
         self.interactive_bregman_plot.add_trace(plotly.Scatter(
             x=[x, x],
             y=[taylor_x_sel, phi_x_sel],
@@ -467,7 +467,6 @@ class Graphs():
             name=r'$\mathbb{D}_{\phi}(x, y)$'
         ))
         
-        # Update the layout of the figure
         self.interactive_bregman_plot.update_layout(
             xaxis_title='x',
             yaxis_title='Value',

@@ -3,7 +3,10 @@ import dash
 from Graphs import Graphs
 from Experiment import ExperimentMD
 from FunctionParser import FunctionParser
+import plotly.graph_objects as plotly 
 import torch
+import json 
+import base64
 
 dash.register_page(__name__, path="/run-experiment")
 
@@ -73,37 +76,44 @@ def construct_model_settings(idx):
     ], className="input-row"),
 ], className="settings")
 
-def construct_mini_settings(idx):
+def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01, bregman="EUCLID"):
     return html.Div([
-    dcc.Markdown(f"**Algorithm parameters ({idx})**"),
-    html.Div([
-        html.Label("Initial value (X)"),
-        dcc.Input(type="number", value=0.5, style={"marginBottom": "5px"}, className="input-values", id={"type": "initial-value-input", "index" : idx}),
-    ], className="input-row"),
-    html.Div([
-        html.Label("Initial value (Y)"),
-        dcc.Input(type="number", value=0.5, style={"marginBottom": "5px"}, className="input-values", id={"type": "initial-value-input-2", "index" : idx}),
-    ], className="input-row"),
-    html.Div([
-        html.Label("Iterations"),
-        dcc.Input(type="number", value=100, style={"marginBottom": "5px"}, className="input-values", id={"type": "number-iterations-input", "index" : idx}),
-    ], className="input-row"),
-    html.Div([
-        html.Label("Learning Rate"),
-        dcc.Input(type="number", value=0.01, step=0.001, style={"marginBottom": "5px"}, className="input-values", id={"type": "lr-mini-input", "index" : idx}),
-    ], className="input-row"),
-    html.Div([
-        html.Label("Bregman"),
-        dcc.Dropdown(
-            options = [
-                {"label": "Euclidean", "value": "EUCLID"},
-                {"label": "KL", "value": "KL"},
-                {"label": "Mahalanobis", "value": "MAHALANOBIS"},
-                {"label": "Itakura-Saito", "value": "ITAKURA-SAITO"}
-            ]    
-        , id={"type": "bregman-mini-input", "index" : idx},className="dropdown", value="EUCLID")
-    ], className = "input-row")
-    ], className="settings", id={"type": "minimise-settings", "index" : idx})
+        dcc.Markdown(f"**Algorithm parameters ({idx})**"),
+        html.Div([
+            html.Label("Initial value (X)"),
+            dcc.Input(type="number", value=init_x, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "initial-value-input", "index": idx}),
+        ], className="input-row"),
+        html.Div([
+            html.Label("Initial value (Y)"),
+            dcc.Input(type="number", value=init_y, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "initial-value-input-2", "index": idx}),
+        ], className="input-row"),
+        html.Div([
+            html.Label("Iterations"),
+            dcc.Input(type="number", value=iterations, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "number-iterations-input", "index": idx}),
+        ], className="input-row"),
+        html.Div([
+            html.Label("Learning Rate"),
+            dcc.Input(type="number", value=lr, step=0.001, min=0, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "lr-mini-input", "index": idx}),
+        ], className="input-row"),
+        html.Div([
+            html.Label("Bregman"),
+            dcc.Dropdown(
+                options=[
+                    {"label": "Euclidean", "value": "EUCLID"},
+                    {"label": "KL", "value": "KL"},
+                    {"label": "Mahalanobis", "value": "MAHALANOBIS"},
+                    {"label": "Itakura-Saito", "value": "ITAKURA-SAITO"}
+                ],
+                value=bregman,
+                id={"type": "bregman-mini-input", "index": idx},
+                className="dropdown"
+            )
+        ], className="input-row")
+    ], className="settings", id={"type": "minimise-settings", "index": idx})
 
 
 function_md_settings = html.Div([
@@ -160,9 +170,23 @@ config_options = html.Div([
     run_button_container
 ], className="configuration-options", id="config-options")
 
+# dcc.store components to act as global variables for callback logic 
+# stores for the current number of experiment configurations 
 num_experiments_min_store = dcc.Store(id="num-experiments-min", data=1)
 num_experiments_approx_store = dcc.Store(id="num-experiments-approx", data=1)
 
+# stores for the last run configuration 
+last_run_config_min_store = dcc.Store(id="last-min-config", data=None)
+last_run_config_approx_store = dcc.Store(id="last-approx-config", data=None)
+
+# download component that gets triggered when a save button is clicked 
+run_config_download = dcc.Download(id="save-config")
+
+# stores the current number save button clicks 
+mini_save_clicks_store = dcc.Store(id="mini-save-clicks", data=0)
+approx_save_clicks_store = dcc.Store(id="approx-save-clicks", data=0)
+
+# stores the current number of approx/mini button clicks 
 global_approx_clicks_store = dcc.Store(id="approx-clicks", data=0)
 global_min_clicks_store = dcc.Store(id="min-clicks", data=0)
 
@@ -207,17 +231,23 @@ layout = html.Div([
     num_experiments_min_store,
     num_experiments_approx_store,
     global_approx_clicks_store,
-    global_min_clicks_store
+    global_min_clicks_store,
+    last_run_config_approx_store,
+    last_run_config_min_store,
+    run_config_download,
+    mini_save_clicks_store,
+    approx_save_clicks_store
     
-], style={"padding": "20px"})
+], style={"padding": "5px 20px 20px 20px"})
 
 
 minimise_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-minimise")
 approximate_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-approximate")
 minimise_add_button = html.Button("+", className="add-button", n_clicks=1, id="add-button-minimise", title="add a configuration")
 approximate_add_button = html.Button("+", className="add-button", n_clicks=1, id="add-button-approximate", title="add a configuration")
-minimise_save_button = html.Button("Save", className="save-button", id="save-button-minimise", disabled=True, title="Cannot save until experiment has ran")
-approximate_save_button = html.Button("Save", className="save-button", id="save-button-approximate", disabled=True,  title="Cannot save until experiment has ran")
+minimise_save_button = html.Button("Save", className="save-button", id="save-button-minimise", disabled=True, title="Cannot save until experiment has ran", n_clicks=0)
+approximate_save_button = html.Button("Save", className="save-button", id="save-button-approximate", disabled=True,  title="Cannot save until experiment has ran", n_clicks=0)
+
 
 
 @callback(
@@ -440,11 +470,23 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, function, range_min, r
         return [dcc.Graph(figure=loss_fig, id="loss-curve", config={'responsive': True},className="graph"),
                 dcc.Graph(figure=gradient_fig, id="gradient-fig",config={'responsive': True}, className="graph"),
                 dcc.Graph(figure=divergence_fig, id="divergence-fig",config={'responsive': True}, className="graph"),
-                dcc.Graph(figure=results_fig, id="results_fig",config={'responsive': True}, className="graph")], 0, False
+                dcc.Graph(figure=results_fig, id="results_fig",config={'responsive': True}, className="graph")],0, False
+                    
     else: 
         return no_update
 
-        
+# function that creates a dictionary of the different experiment configurations used for a minimisation run 
+def create_experiment_dict(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool):
+    experiments_dict = {}
+    for i in range(num_experiments):
+        experiments_dict[f"experiment-{i+1}"] = {
+            "initial_value_x": init_x[i],
+            "initial_value_y": init_y[i] if not second_input_bool[0] else None,
+            "iterations": iter[i],
+            "learning_rate": lr[i],
+            "bregman": bregman[i]
+    }
+    return experiments_dict
         
 # run a minimisation experiment, taking in single or multiple experiment configurations
 # overlays the graphs to directly compare results immediately
@@ -452,6 +494,7 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, function, range_min, r
     Output("experiment-output", "children"),
     Output("run-button-minimise", "n_clicks"),
     Output("save-button-minimise", "disabled"), 
+    Output("last-min-config", "data"),
     Input("run-button-minimise", "n_clicks"),
     State("function-mini-input", "value"),
     State({"type": "initial-value-input", "index": ALL}, "value"),
@@ -509,18 +552,182 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter, lr
             experiment.run_experiment_minimise(inits[i], iter[i], float(lr[i]))
             optimisation_path_fig, gradient_fig, divergence_fig = graph.update_all_graphs_min(experiment.minimisation_guesses, experiment.gradient_logs,experiment.divergence_logs, experiment.objective, i+1, dim)
 
-        n_clicks = 0
+        # store the run configuration for saving 
+        experiments_dict = create_experiment_dict(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool)
+
+        experiment_state = {
+            "configuration": {
+                "experiment_type": "minimise",  
+                "function": objective_string,      
+            },
+            "experiments": experiments_dict,
+            "results": {
+                "mini_guess_logs": experiment.minimisation_guesses,
+                "gradient_logs": experiment.gradient_logs,
+                "divergence_logs": experiment.divergence_logs,
+            },
+            "figures": {
+                "optim_fig": optimisation_path_fig.to_plotly_json(),
+                "gradient_fig": gradient_fig.to_plotly_json(),
+                "divergence_fig": divergence_fig.to_plotly_json(),
+            }
+}
+
         return [dcc.Graph(figure=optimisation_path_fig, id="optimisation-path-fig", config={'responsive': True},className="graph"),
                 dcc.Graph(figure=gradient_fig, id="gradient-fig",config={'responsive': True}, className="graph"),
-                dcc.Graph(figure=divergence_fig, id="divergence-fig",config={'responsive': True}, className="graph")], 0, False
+                dcc.Graph(figure=divergence_fig, id="divergence-fig",config={'responsive': True}, className="graph")], 0, False, experiment_state
     
     else:
         return no_update
 
+@callback(
+    Output("save-button-minimise", "disabled", allow_duplicate=True),
+    Input("function-mini-input", "value"),
+    Input({"type": "initial-value-input", "index": ALL}, "value"),
+    Input({"type": "initial-value-input-2", "index": ALL}, "value"),
+    Input({"type": "number-iterations-input", "index": ALL}, "value"),
+    Input({"type": "lr-mini-input", "index": ALL}, "value"),
+    Input({"type": "bregman-mini-input", "index": ALL}, "value"),
+    Input("num-experiments-min", "data"),
+    Input({"type": "initial-value-input-2", "index": ALL}, "disabled"),
+    State("last-min-config", "data"),
+    prevent_initial_call=True
+)
+def listen_then_disable_save(objective_string, init_x, init_y, iter, lr, bregman, num_experiments, second_input_bool, last_config):
+    # this callback listens for changes in any input paramaters for the minimisation variant.
+    # if configuration has changed since the last run, then disable the save button to prevent users saving a run that has results for a different configuration
+
+    experiments_dict = create_experiment_dict(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool)
+    current_config = {
+            "configuration": {
+                "experiment_type": "minimise",  
+                "function": objective_string,      
+            }}
+    current_config["experiments"] = experiments_dict
 
 
+    if last_config == None: 
+        return no_update
+    print(current_config["experiments"])
+    print(last_config["experiments"])
+    if (current_config["configuration"] != last_config["configuration"]) or (current_config["experiments"] != last_config["experiments"]):
+        return True
+    else:
+        return False 
 
+# replaces "drag and drop..." text with the filename once one has been uploaded 
+@callback(
+        Output("drag-drop-md", "children"),
+        Input("upload-config", "filename")
+)
+def update_upload_prompt(filename):
+    if filename: 
+        return filename 
+    return "**Drag and Drop** or **Select File**"
 
+@callback(
+    Output("save-config", "data"),
+    Output("save-button-minimise", "n_clicks"),
+    Input("save-button-minimise", "n_clicks"),
+    State("last-min-config", "data"),
+    prevent_initial_call=True
+)
+def download_minimise_experiment(n_clicks, experiment_data):
+    # triggers a download upon save button being clicked
+    # have to store n_clicks in a global dcc.store in order to compare to the save buttons value
+    # as this callback gets triggered when the user adds a configuration due to the save button reloading 
+    triggered = callback_context.triggered
+    if not triggered:
+        return no_update
+    # Check if the triggered prop_id exactly matches "save-button-minimise.n_clicks"
+    print("save button n_clicks = ", n_clicks)
+    triggered_id = triggered[0]["prop_id"]
+    if triggered_id != "save-button-minimise.n_clicks" or n_clicks == 0 or not experiment_data:
+        return no_update
+    
+    json_str = json.dumps(experiment_data, indent=2)
+
+    return dict(content=json_str, filename="experiment.json"), 0
+    
+
+# builds a matching minimise-configuration from the saved json
+def build_minimise_config_from_saved(saved_state):
+    experiments = saved_state.get("experiments", {})
+
+    experiment_configs = []
+    for i in range(len(experiments)):
+        exp = experiments.get(f"experiment-{i+1}")
+        experiment_configs.append(construct_mini_settings(i+1,exp.get("initial_value_x"),
+                                                        exp.get("initial_value_y"),
+                                                        exp.get("iterations"),
+                                                        exp.get("learning_rate"),
+                                                        exp.get("bregman")))
+    print("length of experiment configs ", len(experiment_configs))
+    minimise_config = html.Div([html.Div([
+    dcc.Markdown("**Objective function and algorithm parameters**"),
+    html.Div([
+        html.Label("Objective Function"),
+        dcc.Input(type="text", value=saved_state["configuration"].get("function", ""), style={"marginBottom": "5px"}, className="input-function", id="function-mini-input"),
+    ], className="input-row"),
+    html.Div([
+        html.Label("Variables"),
+        dcc.Input(type="number", value=1, step=1, min=1, max=2, style={"marginBottom": "5px"}, className="input-values", id="num-variables-input"),
+    ], className="input-row")] + experiment_configs
+    , className= "settings", id="inner-div")], id="minimise-config", className="option-columns-mlp")
+
+    return minimise_config
+
+# rebuilds the graphs from the saved experiment json
+def build_experiment_results_from_saved(saved_state):
+    
+    figs = saved_state.get("figures", {})
+    graphs = []
+    if "optim_fig" in figs:
+        optim_fig = plotly.Figure(figs["optim_fig"])
+        graphs.append(dcc.Graph(figure=optim_fig, id="optimisation-path-fig", config={'responsive': True}, className="graph"))
+    if "gradient_fig" in figs:
+        gradient_fig = plotly.Figure(figs["gradient_fig"])
+        graphs.append(dcc.Graph(figure=gradient_fig, id="gradient-fig", config={'responsive': True}, className="graph"))
+    if "divergence_fig" in figs:
+        divergence_fig = plotly.Figure(figs["divergence_fig"])
+        graphs.append(dcc.Graph(figure=divergence_fig, id="divergence-fig", config={'responsive': True}, className="graph"))
+    
+    return graphs
+
+@callback(
+    Output("config-options", "children", allow_duplicate=True),
+    Output("experiment-output", "children", allow_duplicate=True),
+    Output("num-experiments-min", "data", allow_duplicate=True),
+    Output("add-button-minimise", "n_clicks", allow_duplicate=True),
+    Input("upload-load", "n_clicks"),
+    State("upload-config", "contents"),
+    State("upload-config", "filename"),
+    State("config-options", "children"),
+    prevent_initial_call=True
+)
+def load_experiment(n_clicks, contents, filename, current_children):
+    
+    triggered = callback_context.triggered
+    if not triggered:
+        return no_update
+    # Check if the triggered prop_id exactly matches "save-button-minimise.n_clicks"
+    print("save button n_clicks = ", n_clicks)
+    triggered_id = triggered[0]["prop_id"]
+    if triggered_id != "upload-load.n_clicks" or n_clicks == 0 or not contents:
+        return no_update
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    saved_experiment = json.loads(decoded.decode("utf-8"))
+
+    num_experiments = len(saved_experiment.get("experiments", {}))
+
+    minimise_config = build_minimise_config_from_saved(saved_experiment)
+    print("minimise config len ", len(minimise_config))
+    new_children = current_children[:2] + [minimise_config, approx_config] + [current_children[-1]]
+
+    new_experiment_results = build_experiment_results_from_saved(saved_experiment)
+    return new_children, new_experiment_results, num_experiments, num_experiments
+    
 
 
 

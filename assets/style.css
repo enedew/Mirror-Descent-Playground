@@ -498,7 +498,8 @@ div[id*='"type":"bregman-mini-input"']{
     border-radius: 5px;
     display: flex;
     flex-direction: column;
-    margin-right: 1vw;
+    margin-right: 0.5vw;
+    margin-top: 0.5vh;
     align-self: flex-start;
     align-items: center;
     justify-content:flex-start;
@@ -511,16 +512,17 @@ div[id*='"type":"bregman-mini-input"']{
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
     gap: 10px;
+    margin-top: 0.5vh;
 }
 
-.experiment-graphs .dash-graph {
-    min-width: 0;
-    min-height: 0;
-}
+/* .experiment-graphs .dash-graph {
+    
+} */
 
 .graph {
     font-family: "Roboto", serif;
     font-optical-sizing: auto;
+    min-height: 450px;
 }
 
 .experiment-div {
