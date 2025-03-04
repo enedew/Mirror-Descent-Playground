@@ -267,7 +267,9 @@ h4 {
     width: 90%;
 }
 
-
+#model-settings-1 {
+    width: 11.3vw;
+}
 
 
 .markdown-config{
@@ -335,11 +337,11 @@ h4 {
     cursor: pointer;
 }
 
-.save-button:disabled{
+.save-button:disabled, .add-button:disabled{
     background-color: #b4b1be
 }
 
-.save-button:disabled:hover{
+.save-button:disabled:hover, .add-button:disabled:hover{
     background-color: #b4b1be;
     cursor: default;
 }
