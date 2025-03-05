@@ -35,9 +35,11 @@ def construct_md_settings(idx, batch_size=500, bregman="EUCLID", loss="MSE", lr=
     html.Div([
         html.Label("Bregman"),
         dcc.Dropdown(
-            options = [
+            options=[
                 {"label": "Euclidean", "value": "EUCLID"},
-                {"label": "KL", "value": "KL"}
+                {"label": "KL", "value": "KL"},
+                {"label": "Mahalanobis", "value": "MAHALANOBIS"},
+                {"label": "Itakura-Saito", "value": "ITAKURA-SAITO"}
             ]    
         , id={"type": "bregman-input", "index": idx},className="bregman-loss-input", value=bregman)
     ], className = "input-row"),
@@ -633,12 +635,13 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter, lr
         optimisation_path_fig = graph.create_optimisation_path_graph(experiment.minimisation_guesses, experiment.objective, dim)
         gradient_fig = graph.create_gradient_norm_graph(experiment.gradient_logs)
         divergence_fig = graph.create_divergence_graph(experiment.divergence_logs)
+        dual_fig = graph.create_dual_space_trajectory_graph(experiment.optimiser.logs["dual"],experiment.objective, dim)
 
         for i in range(1, num_experiments):
             experiment.clear()
             experiment.bregman = bregman[i]
             experiment.run_experiment_minimise(inits[i], iter[i], float(lr[i]))
-            optimisation_path_fig, gradient_fig, divergence_fig = graph.update_all_graphs_min(experiment.minimisation_guesses, experiment.gradient_logs,experiment.divergence_logs, experiment.objective, i+1, dim)
+            optimisation_path_fig, gradient_fig, divergence_fig, dual_fig = graph.update_all_graphs_min(experiment.minimisation_guesses, experiment.gradient_logs,experiment.divergence_logs, experiment.optimiser.logs["dual"],experiment.objective, i+1, dim)
 
         # store the run configuration for saving 
         experiments_dict = create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool)
@@ -662,6 +665,7 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter, lr
 }
 
         return [dcc.Graph(figure=optimisation_path_fig, id="optimisation-path-fig", config={'responsive': True},className="graph"),
+                dcc.Graph(figure=dual_fig, id="dual-fig",config={'responsive': True}, className="graph"),
                 dcc.Graph(figure=gradient_fig, id="gradient-fig",config={'responsive': True}, className="graph"),
                 dcc.Graph(figure=divergence_fig, id="divergence-fig",config={'responsive': True}, className="graph")], 0, False, experiment_state
     
@@ -754,7 +758,8 @@ def listen_then_disable_save_min(objective_string, init_x, init_y, iter, lr, bre
 )
 def listen_then_disable_save_approx(layers, neurons, epochs, objective_string, range_min, range_max,
                         n_samples, batch_size, bregman, loss, lr, num_experiments, last_config):
-    
+    # if num_experiments > len(layers):
+    #     return no_update
     experiments_dict = create_experiment_dict_approx(num_experiments, layers, neurons, epochs, batch_size, lr, bregman, loss)
     current_config = {
             "configuration": {
@@ -897,7 +902,7 @@ def build_approximate_config_from_saved(saved_state):
     ], className="settings", id="function-md-settings")
 
     if len(experiment_configs) > 1: 
-        approx_config = [html.Div([experiment_configs[0][0], function_md_settings], id="approx-config", className="option-columns-mlp"), settings_divs]
+        approx_config = [html.Div([experiment_configs[0][0], function_md_settings], id="approx-config", className="option-columns-mlp")] +[settings_divs[i] for i in range(len(settings_divs))]
     else: 
         approx_config = html.Div([
             experiment_configs[0][0], function_md_settings],
@@ -983,8 +988,11 @@ def load_experiment(load_clicks, contents, filename, current_children):
     
     elif saved_experiment["configuration"].get("experiment_type") == "approximate":
         approx_config_new = build_approximate_config_from_saved(saved_experiment)
+        if num_experiments == 1:
+            new_children = current_children[:2] + [minimise_config] + [approx_config_new] + [current_children[-1]]
+        else:
+            new_children = current_children[:2] + [minimise_config] + [approx_config_new[i] for i in range(len(approx_config_new))] + [current_children[-1]]
 
-        new_children = current_children[:2] + [minimise_config] + approx_config_new + [current_children[-1]]
         new_experiment_results = build_experiment_results_from_saved(saved_experiment, "approximate")
 
         return new_children, new_experiment_results, no_update, num_experiments, num_experiments, "config-button-clicked", "config-button", "approximate", "option-columns-mlp hidden", "option-columns-mlp"

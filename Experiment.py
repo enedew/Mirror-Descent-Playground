@@ -59,7 +59,7 @@ class ExperimentMD():
 
     def construct_optimiser(self, params, lr):
         # function to construct the optimiser from the mirror descent class
-        self.optimiser = MirrorDescent(params, lr, self.bregman)
+        self.optimiser = MirrorDescent(params, lr, self.bregman, logs=True)
 
 
     def generate_data(self, lbound, ubound, n_samples):

@@ -391,6 +391,97 @@ class Graphs():
 
         return self.optimisation_path_graph
     
+    def create_dual_space_trajectory_graph(self, dual_logs, objective, dim):
+        
+        self.dual_space_graph = plotly.Figure()
+        
+        print("Dual logs (first 10):", dual_logs[:10])
+        
+        x_vals = [point[0] for point in dual_logs]
+        y_vals = [point[1] for point in dual_logs]
+        
+        
+        self.dual_space_graph.add_trace(plotly.Scatter(
+            x=x_vals,
+            y=y_vals,
+            mode='lines+markers',
+            line=dict(color=self.line_colors[1], width=2),
+            marker=dict(size=2, color=self.line_colors[1], symbol='circle'),
+            name="Dual Trajectory"
+        ))
+        
+        self.dual_space_graph.update_layout(
+            title='Dual Space Optimisation Path',
+            xaxis_title='y[0]',
+            yaxis_title='y[1]',
+            font=dict(family="Roboto", color="black"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            plot_bgcolor="#f2e9dd",
+            paper_bgcolor="#f2e9dd"
+        )
+        self.dual_space_graph.update_xaxes(
+            gridcolor="#e8dac5",
+            linecolor="#322634",
+            zerolinecolor="#e8dac5"
+        )
+        self.dual_space_graph.update_yaxes(
+            gridcolor="#e8dac5",
+            linecolor="#322634",
+            zerolinecolor="#e8dac5"
+        )
+        
+        return self.dual_space_graph
+    
+    def add_dual_space_trajectory(self, dual_logs, exp_number):
+        
+        
+        if isinstance(dual_logs[0], (list, tuple, np.ndarray)) and len(dual_logs[0]) == 2:
+            
+            x_vals = [point[0] for point in dual_logs]
+            y_vals = [point[1] for point in dual_logs]
+            self.dual_space_graph.add_trace(plotly.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode='lines+markers',
+                line=dict(color=self.line_colors[2], width=2),
+                marker=dict(size=2, color=self.line_colors[exp_number], symbol='circle'),
+                name=exp_number
+            ))
+            
+            new_x_min = min(x_vals) - 1
+            new_x_max = max(x_vals) + 1
+            new_y_min = min(y_vals) - 1
+            new_y_max = max(y_vals) + 1
+            
+            current_x_range = self.dual_space_graph.layout.xaxis.range if self.dual_space_graph.layout.xaxis.range else [new_x_min, new_x_max]
+            current_y_range = self.dual_space_graph.layout.yaxis.range if self.dual_space_graph.layout.yaxis.range else [new_y_min, new_y_max]
+            new_x_min = min(new_x_min, current_x_range[0])
+            new_x_max = max(new_x_max, current_x_range[1])
+            new_y_min = min(new_y_min, current_y_range[0])
+            new_y_max = max(new_y_max, current_y_range[1])
+            self.dual_space_graph.update_xaxes(range=[new_x_min, new_x_max])
+            self.dual_space_graph.update_yaxes(range=[new_y_min, new_y_max])
+        else:
+            
+            self.dual_space_graph.add_trace(plotly.Scatter(
+                x=list(range(len(dual_logs))),
+                y=dual_logs,
+                mode='markers+lines',
+                marker=dict(size=2, color=self.line_colors[2], symbol="circle"),
+                line=dict(color=self.line_colors[exp_number], width=2),
+                name=exp_number,
+                opacity=0.5
+            ))
+            
+            new_y_min = min(dual_logs) - 1
+            new_y_max = max(dual_logs) + 1
+            current_y_range = self.dual_space_graph.layout.yaxis.range if self.dual_space_graph.layout.yaxis.range else [new_y_min, new_y_max]
+            new_y_min = min(new_y_min, current_y_range[0])
+            new_y_max = max(new_y_max, current_y_range[1])
+            self.dual_space_graph.update_yaxes(range=[new_y_min, new_y_max])
+        
+        return self.dual_space_graph
+    
     def create_interactive_bregman_graph(self, x, y):
         def phi(x):
             return x**2
@@ -544,11 +635,12 @@ class Graphs():
 
         self.optimisation_path_graph.data[0].update(x=x_range, y=y_range, z=Z)
         
-    def update_all_graphs_min(self, minimisation_guesses, gradient_logs, divergence_logs, objective, exp_number, dim):
+    def update_all_graphs_min(self, minimisation_guesses, gradient_logs, divergence_logs, dual_logs, objective, exp_number, dim):
         updated_optimisation = self.add_optimisation_path(minimisation_guesses=minimisation_guesses, objective=objective, exp_number=exp_number, dim=dim)
         updated_gradient =self.add_gradient_norm(gradient_logs=gradient_logs, exp_number=exp_number)
         updated_divergence = self.add_divergence(divergence_logs=divergence_logs, exp_number=exp_number)
-        return updated_optimisation, updated_gradient, updated_divergence
+        updated_dual = self.add_dual_space_trajectory(dual_logs=dual_logs, exp_number=exp_number)
+        return updated_optimisation, updated_gradient, updated_divergence, updated_dual
 
     def update_all_graphs_approx(self, loss_logs, gradient_logs, divergence_logs, prediction_data, exp_number):
         updated_loss = self.add_loss_curve(loss_logs=loss_logs, exp_number=exp_number)

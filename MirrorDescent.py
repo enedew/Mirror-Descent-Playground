@@ -13,9 +13,9 @@ mirror_map_dict = {
     'EUCLID' : lambda x: x,
     'MAHALANOBIS': lambda x: torch.matmul(Q, x),
     # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
-    'KL' : lambda x: torch.log(x + 1e-8) + 1,
+    'KL' : lambda x: torch.log(x + 1e-8)+1,
     'ITAKURA-SAITO': lambda x: -1.0/x
-}
+} 
 
 # dictionary of inverse mirror maps for different bregman divergences 
 
