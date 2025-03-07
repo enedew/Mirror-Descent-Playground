@@ -9,7 +9,9 @@ class ExperimentMD():
     # results variable determines wheter the calculate_metrics function should calculate classification or regression metrics 
     # and whether this should be recorded/calculated or not 
     def __init__(self, objective = lambda x: x**2, bregman="EUCLID", results = 'R',
-                  gradient_calculation = "Classical"):
+                gradient_calculation = "Classical",
+                Q = torch.tensor([[10, 0.0], [0.0, 1.0]]),
+                Q_inv=torch.tensor([[0.1,0.0], [0.0, 1.0]])):
         self.results = results 
         self.objective = objective 
         self.bregman = bregman 
@@ -21,10 +23,9 @@ class ExperimentMD():
             "Huber" : torch.nn.HuberLoss()
         }
         # matrix for mahalanobis distance
-        self.Q = torch.tensor([[2.0, 0.0],
-                  [0.0, 1.0]])
-        self.Q_inv = torch.tensor([[0.5, 0.0],
-                            [0.0, 1.0]])  
+        self.Q = Q
+        self.Q_inv = Q_inv 
+
         self.dgfs = {
             'EUCLID' : lambda x: 0.5 * torch.sum(x**2),
             # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
@@ -59,7 +60,8 @@ class ExperimentMD():
 
     def construct_optimiser(self, params, lr):
         # function to construct the optimiser from the mirror descent class
-        self.optimiser = MirrorDescent(params, lr, self.bregman, logs=True)
+        print(self.Q)
+        self.optimiser = MirrorDescent(params, lr, self.bregman, self.Q, self.Q_inv, logs=True)
 
 
     def generate_data(self, lbound, ubound, n_samples):
@@ -164,7 +166,13 @@ class ExperimentMD():
         print("Optimiser constructed, now starting minimisation")
         for i in range(iter):
             self.optimiser.zero_grad()
+            current_scale = x.data.sum()
+            normalized_x = x / current_scale
+            
+            
             y = self.objective(*x)
+            
+
             y.backward()
 
             # recording gradient norms
@@ -177,7 +185,8 @@ class ExperimentMD():
                     old_params.append(param.data.clone())
             
             self.optimiser.step()
-
+            if self.bregman == "KL":
+                x.data = x.data / x.data.sum()
             # calculate and record the bregman divergence between params of this iteration and the next
             self.calculate_record_bregman_divergence(old_params)
 

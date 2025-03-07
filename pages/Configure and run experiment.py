@@ -7,6 +7,7 @@ import plotly.graph_objects as plotly
 import torch
 import json 
 import base64
+import numpy as np
 
 dash.register_page(__name__, path="/run-experiment")
 
@@ -57,7 +58,7 @@ def construct_md_settings(idx, batch_size=500, bregman="EUCLID", loss="MSE", lr=
         html.Label("Learning Rate"),
         dcc.Input(type="number", value=lr, step=0.001, min=0, style={"marginBottom": "5px"}, className="input-values", id={"type": "lr-input", "index": idx}),
     ], className="input-row")
-    ], className="settings")
+    ], className="model-settings")
 
 
 def construct_model_settings(idx, layers=2, neurons=10, epochs=2000):
@@ -76,7 +77,7 @@ def construct_model_settings(idx, layers=2, neurons=10, epochs=2000):
         html.Label("Epochs"),
         dcc.Input(type="number", value=epochs, style={"marginBottom": "5px"}, className="input-values", id={"type": "epoch-input", "index": idx})
     ], className="input-row"),
-], className="settings", id=f"model-settings-{idx}")
+], className="model-settings-left", id=f"model-settings-{idx}")
 
 def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01, bregman="EUCLID"):
     return html.Div([
@@ -114,7 +115,12 @@ def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01
                 id={"type": "bregman-mini-input", "index": idx},
                 className="dropdown"
             )
-        ], className="input-row")
+        ], className="input-row"),
+        html.Div([
+            html.Label("Positive Definite Matrix"),
+            dcc.Input(type="text", value="2, 0, 0, 1", step=0.001, min=0, style={"marginBottom": "5px"},
+                      className="input-function", id={"type": "Q-input", "index": idx}),
+        ], className="input-row", id={"type": "Q-input-row", "index": idx})
     ], className="settings", id={"type": "minimise-settings", "index": idx})
 
 
@@ -135,18 +141,70 @@ function_md_settings = html.Div([
     ], className="input-row"),
     construct_md_settings(1)
     
-], className="settings", id="function-md-settings")
+], className="model-settings", id="function-md-settings")
+
+
 
 minimise_config = html.Div([html.Div([
     dcc.Markdown("**Objective function and algorithm parameters**"),
+    html.Div([
+        html.Label("Function Presets"),
+        dcc.Dropdown(
+            options=[
+                {"label": "Custom", "value": "CUSTOM"},
+                {"label": "Anisotropic", "value": "ANISO"},
+                {"label": "3D Simplex", "value": "SIMPLEX"}
+            ]    
+        , id="preset-function-input",className="dropdown", value="CUSTOM")
+    ], className = "input-row"),
     html.Div([
         html.Label("Objective Function"),
         dcc.Input(type="text", value="X**2 + Y**2", style={"marginBottom": "5px"}, className="input-function", id="function-mini-input"),
     ], className="input-row"),
     html.Div([
-        html.Label("Variables"),
-        dcc.Input(type="number", value=1, step=1, min=1, max=2, style={"marginBottom": "5px"}, className="input-values", id="num-variables-input"),
-    ], className="input-row"),
+        html.Label("Variable (a)"),
+        dcc.Input(type="number", value=10, style={"marginBottom": "5px"}, className="input-values", id="a-input")
+    ], className="input-row hidden", id="a-input-row"),
+    html.Div([
+        html.Label("Variable (B)"),
+        dcc.Input(type="number", value=2, style={"marginBottom": "5px"}, className="input-values", id="b-input")
+    ], className="input-row hidden", id="b-input-row"),
+    html.Div([
+        html.Label("Optimum (x)"),
+        dcc.Input(type="number", value=10, style={"marginBottom": "5px"}, className="input-values", id="optim-x-input")
+    ], className="input-row hidden", id="optim-x-input-row"),
+    html.Div([
+        html.Label("Optimum (y)"),
+        dcc.Input(type="number", value=10, style={"marginBottom": "5px"}, className="input-values", id="optim-y-input")
+    ], className="input-row hidden", id="optim-y-input-row"),
+    html.Div([
+        html.Label("Noise"),
+        dcc.Input(type="number", value=0.0, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="noise-input")
+    ], className="input-row hidden", id="noise-input-row"),
+    html.Div([
+        html.Label("Initial p1"),
+        dcc.Input(type="number", value=0.3, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="p1-input")
+    ], className="input-row hidden", id="p1-input-row"),
+    html.Div([
+        html.Label("Initial p2"),
+        dcc.Input(type="number", value=0.2, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="p2-input")
+    ], className="input-row hidden", id="p2-input-row"),
+    html.Div([
+        html.Label("Initial p3"),
+        dcc.Input(type="number", value=0.5, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="p3-input")
+    ], className="input-row hidden", id="p3-input-row"),
+    html.Div([
+        html.Label("Target q1"),
+        dcc.Input(type="number", value=0.1, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q1-input")
+    ], className="input-row hidden", id="q1-input-row"),
+    html.Div([
+        html.Label("Target q2"),
+        dcc.Input(type="number", value=0.7, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q2-input")
+    ], className="input-row hidden", id="q2-input-row"),
+    html.Div([
+        html.Label("Target q3"),
+        dcc.Input(type="number", value=0.2, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q3-input")
+    ], className="input-row hidden", id="q3-input-row"),
     construct_mini_settings(1)
 ], className= "settings", id="inner-div")], id="minimise-config", className="option-columns-mlp")
 
@@ -155,9 +213,12 @@ approx_config = html.Div([
                 id="approx-config", className="option-columns-mlp hidden")
 
 
+
+
+
+
+
 # placeholder variables to be updated via callback
-
-
 minimise_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-minimise")
 minimise_add_button = html.Button("+", className="add-button", n_clicks=1, id="add-button-minimise", title="add a configuration")
 minimise_save_button = html.Button("Save", className="save-button", id="save-button-minimise", disabled=True, title="Cannot save until experiment has ran", n_clicks=0)
@@ -174,7 +235,7 @@ experiment_results = html.Div([], id="experiment-output", className="experiment-
 experiment_settings_type_store = dcc.Store(id="experiment-settings-type", data="minimise")
 
 config_options = html.Div([
-    dcc.Markdown("#### Configuration", className="markdown-config"),
+    dcc.Markdown("#### Configuration", className="markdown-config", id="config-title"),
     html.Div([
         html.Button("Approximate", className="config-button", id="approx-button", n_clicks=0),
         html.Button("Minimise",   className="config-button-clicked", id="min-button",   n_clicks=0)
@@ -207,6 +268,9 @@ approx_save_clicks_store = dcc.Store(id="approx-save-clicks", data=0)
 # stores the current number of approx/mini button clicks 
 global_approx_clicks_store = dcc.Store(id="approx-clicks", data=0)
 global_min_clicks_store = dcc.Store(id="min-clicks", data=0)
+
+# stores the currently inputted Q matrices as tensors for use in experiment callbacks
+Q_store = dcc.Store(id="Q-store", data=None)
 
 
 layout = html.Div([
@@ -256,10 +320,39 @@ layout = html.Div([
     mini_save_clicks_store,
     approx_save_clicks_store,
     load_min_bool,
-    load_approx_bool
+    load_approx_bool,
+    Q_store
     
 ], style={"padding": "5px 20px 20px 20px"})
 
+
+
+
+@callback(
+    Output("a-input-row", "className"),
+    Output("b-input-row", "className"),
+    Output("optim-x-input-row", "className"),
+    Output("optim-y-input-row", "className"),
+    Output("noise-input-row", "className"),
+    Output("p1-input-row", "className"),
+    Output("p2-input-row", "className"),
+    Output("p3-input-row", "className"),
+    Output("q1-input-row", "className"),
+    Output("q2-input-row", "className"),
+    Output("q3-input-row", "className"),
+    Output("function-mini-input", "value"),
+    Input("preset-function-input", "value"),
+    prevent_initial_call=True
+)
+def add_preset_variable_inputs(preset_function):
+    if preset_function == "ANISO":
+        return ["input-row"]*5 + ["input-row hidden"]*6 + ["a*(x - optx)**2 + b*(y-opty)"]
+    elif preset_function == "SIMPLEX":
+        return ["input-row hidden"]*5 + ["input-row"]*6 + ["sum(q * log(q / p))"]
+    elif preset_function == "CUSTOM":
+        return ["input-row hidden"]*5 + ["input-row hidden"]*6 + ["X**2 + Y**2"]
+    else:
+        return no_update
 
 
 
@@ -400,6 +493,58 @@ def disable_enable_remove_button_approximate(num_experiments):
 def update_batch_size(num_samples):
     return num_samples
 
+# callback to add input field for positive definite matrix Q when mahalanobis distance is selected
+@callback(
+    Output({"type": "Q-input-row", "index": ALL}, "className"),
+    Input({"type": "bregman-mini-input", "index": ALL}, "value")
+)
+def show_Q_input(bregman_fields):
+    new_q_input_classes = []
+    for i in range(len(bregman_fields)):
+        if bregman_fields[i] == "MAHALANOBIS":
+            new_q_input_classes.append("input-row")
+        else:
+            new_q_input_classes.append("input-row hidden")
+
+    return new_q_input_classes
+
+# callback to check if the input for the above is positive definite, shows invalid input with red border if not
+@callback(
+    Output({"type": "Q-input", "index": ALL}, "className"),
+    Output("Q-store", "data"),
+    Input({"type": "Q-input", "index": ALL}, "value"),
+    State({"type": "Q-input-row", "index": ALL}, "className")
+)
+def check_positive_definite(input_values, total_input_components):
+    classnames = []
+    qs = []
+    for input in input_values:
+        try: 
+            numbers = list(map(float, input.split(',')))
+            print("matrix nums: ", numbers)
+            if len(numbers) != 4:
+                classnames.append("input-function invalid")
+                qs.append([None, None]) 
+            else: 
+                matrix = np.array(numbers).reshape((2, 2))
+
+                if np.all(np.linalg.eigvals(matrix) > 0):
+                    classnames.append("input-function") 
+                    Q = torch.tensor(matrix)
+                    Q_inv = torch.linalg.inv(Q)
+                    qs.append([Q.tolist(), Q_inv.tolist()])
+                else:
+                    classnames.append("input-function invalid")
+                    qs.append([None, None]) 
+        except Exception: 
+            classnames.append("input-function invalid")
+            qs.append([None, None]) 
+    return classnames, qs
+
+
+    
+         
+    
 
 # callback triggers when either the minimise or approximate button is clicked and updates experiment_type store
 # also makes sure to remove any extra configurations that have been added for the previous type of experiment
@@ -498,13 +643,14 @@ def update_run_button(experiment_type):
     State({"type": "loss-input", "index": ALL}, "value"),
     State({"type": "lr-input", "index": ALL}, "value"),
     State("num-experiments-approx", "data"),
+    State("Q-store", "data"),
     prevent_initial_call=True,
     allow_duplicate=True,
     suppress_callback_exceptions=True,
     debug=False
 )
 def run_experiment_mlp(n_clicks, layers, neurons, epochs, objective_string, range_min, range_max,
-                        n_samples, batch_size, bregman, loss, lr, num_experiments):
+                        n_samples, batch_size, bregman, loss, lr, num_experiments, q_store):
     if n_clicks != 0:       
         # parse from string the function to approximate
         parser = FunctionParser(objective_string)
@@ -514,7 +660,7 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, objective_string, rang
         print(fta(torch.tensor(1)))
 
         # instantiate the experiment object
-        experiment = ExperimentMD(fta, bregman=bregman[0])
+        experiment = ExperimentMD(fta, bregman=bregman[0], Q=q_store[0][0], Q_inv=q_store[0][1])
         print("Experiment instantiated")
         experiment.criterion = experiment.losses[loss[0]]
 
@@ -535,7 +681,7 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, objective_string, rang
             # clear the experiment logs for the next experiment
             experiment.clear() 
             # update bregman and loss
-            experiment.bregman, experiment.criterion = bregman[i], experiment.losses[loss[i]]
+            experiment.bregman, experiment.criterion, experiment.Q, experiment.Q_inv = bregman[i], experiment.losses[loss[i]], q_store[i][0], q_store[i][1]
             # run the new experiment
             experiment.run_experiment_mlp(range_min, range_max, n_samples, batch_size[i], layers[i],
                                        neurons[i], epochs[i], float(lr[i]))
@@ -594,12 +740,13 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, objective_string, rang
     State({"type": "bregman-mini-input", "index": ALL}, "value"),
     State("num-experiments-min", "data"),
     State({"type": "initial-value-input-2", "index": ALL}, "disabled"),
+    State("Q-store", "data"),
     prevent_initial_call=True,
     allow_duplicate=True,
     suppress_callback_exceptions=True
     
 )
-def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter, lr, bregman, num_experiments, second_input_bool):
+def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter, lr, bregman, num_experiments, second_input_bool, q_store):
     if n_clicks != 0:
         # parse objective function from string 
         print(second_input_bool)
@@ -619,9 +766,9 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter, lr
         parser = FunctionParser(objective_string)
         
         objective = parser.string_to_lambda()
-
+        print(q_store)
         # instantiate experiment object
-        experiment = ExperimentMD(objective, bregman=bregman[0])
+        experiment = ExperimentMD(objective, bregman=bregman[0], Q=torch.tensor(q_store[0][0], dtype=torch.float32), Q_inv=torch.tensor(q_store[0][1], dtype=torch.float32))
         print("Experiment instantiated")
 
         # run experiment, generate and return figures
@@ -639,9 +786,11 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter, lr
 
         for i in range(1, num_experiments):
             experiment.clear()
-            experiment.bregman = bregman[i]
+            experiment.bregman, experiment.Q, experiment.Q_inv = bregman[i],  torch.tensor(q_store[i][0], dtype=torch.float32), torch.tensor(q_store[i][1], dtype=torch.float32)
             experiment.run_experiment_minimise(inits[i], iter[i], float(lr[i]))
-            optimisation_path_fig, gradient_fig, divergence_fig, dual_fig = graph.update_all_graphs_min(experiment.minimisation_guesses, experiment.gradient_logs,experiment.divergence_logs, experiment.optimiser.logs["dual"],experiment.objective, i+1, dim)
+            optimisation_path_fig, gradient_fig, divergence_fig, dual_fig = graph.update_all_graphs_min(experiment.minimisation_guesses, experiment.gradient_logs,
+                                                                                                        experiment.divergence_logs, experiment.optimiser.logs["dual"],
+                                                                                                        experiment.objective, i+1, dim)
 
         # store the run configuration for saving 
         experiments_dict = create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool)

@@ -311,6 +311,8 @@ class Graphs():
                 z=Z,
                 colorscale=[[0,"#f2e9dd"], [1,"#52432f"]],
                 contours=dict(showlabels=True, labelfont=dict(size=10)),
+                ncontours=40,
+                line=dict(color='rgba(82,67,47,0.7)', width=1),
                 hoverinfo='none'
             ))
 
@@ -443,7 +445,7 @@ class Graphs():
                 x=x_vals,
                 y=y_vals,
                 mode='lines+markers',
-                line=dict(color=self.line_colors[2], width=2),
+                line=dict(color=self.line_colors[exp_number], width=2),
                 marker=dict(size=2, color=self.line_colors[exp_number], symbol='circle'),
                 name=exp_number
             ))
@@ -467,7 +469,7 @@ class Graphs():
                 x=list(range(len(dual_logs))),
                 y=dual_logs,
                 mode='markers+lines',
-                marker=dict(size=2, color=self.line_colors[2], symbol="circle"),
+                marker=dict(size=2, color=self.line_colors[exp_number], symbol="circle"),
                 line=dict(color=self.line_colors[exp_number], width=2),
                 name=exp_number,
                 opacity=0.5
@@ -625,7 +627,7 @@ class Graphs():
     
     def update_contour(self, objective):
         # function for dynamically re-computing the plotly contour for additional trajectories
-        x_bounds, y_bounds = self.compute_dynamic_range(self.trajectories, padding_ratio=0.2)
+        x_bounds, y_bounds = self.compute_dynamic_range(self.trajectories, padding_ratio=0.1)
         x_range = np.linspace(x_bounds[0], x_bounds[1], 200)
         y_range = np.linspace(y_bounds[0], y_bounds[1])
 

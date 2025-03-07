@@ -2,9 +2,9 @@ import torch
 from torch.optim import Optimizer 
 
 # defining some matrix Q for mahalanobis distance 
-Q = torch.tensor([[2.0, 0.0],
+Q = torch.tensor([[10, 0.0],
                   [0.0, 1.0]])
-Q_inv = torch.tensor([[0.5, 0.0],
+Q_inv = torch.tensor([[0.1, 0.0],
                       [0.0, 1.0]])
 
 # dictionary of mirror maps for different bregman divergences 
@@ -28,10 +28,29 @@ inv_mirror_map_dict = {
 
 
 class MirrorDescent(Optimizer):
-    def __init__(self, params, lr=0.01, bregman='EUCLID', logs=True):
+    def __init__(self, params, lr=0.01, bregman='EUCLID',
+                Q = torch.tensor([[10, 0.0], [0.0, 1.0]]),
+                Q_inv=torch.tensor([[0.1,0.0], [0.0, 1.0]]), logs=True):
         # set the mirror map and its inverse to the corresponding functions 
-        self.grad_psi = mirror_map_dict[bregman]
-        self.inv_grad_psi = inv_mirror_map_dict[bregman]
+        self.mirror_map_dict = { 
+            # domain R^n
+            'EUCLID' : lambda x: x,
+            'MAHALANOBIS': lambda x: torch.matmul(Q, x),
+            # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
+            'KL' : lambda x: torch.log(x + 1e-8)+1,
+            'ITAKURA-SAITO': lambda x: -1.0/x
+        } 
+
+        # dictionary of inverse mirror maps for different bregman divergences 
+
+        self.inv_mirror_map_dict = {
+            'EUCLID' : lambda x: x,
+            'MAHALANOBIS': lambda x: torch.matmul(Q_inv, x),
+            'KL' : lambda x: torch.exp(x-1),
+            'ITAKURA-SAITO': lambda x: -1.0/x 
+        }
+        self.grad_psi = self.mirror_map_dict[bregman]
+        self.inv_grad_psi = self.inv_mirror_map_dict[bregman]
 
         # create a dict of hyperparameters
         defaults = dict(lr=lr)

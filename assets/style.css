@@ -247,12 +247,39 @@ h4 {
     font-family: "Roboto", serif;
     color: var(--ds);
     flex: 1 1 auto;
+    border-top: 1px dashed var(--mc);
+    padding-top: 0.5vh;
 }
+
+.model-settings-left {
+    font-family: "Roboto", serif;
+    color: var(--ds);
+    flex: 1 1 auto;
+    border-top: 1px dashed var(--mc);
+    padding-top: 0.5vh;
+    max-width: 8vw;
+    
+    margin-right: 3px;
+}
+
+.model-settings {
+    font-family: "Roboto", serif;
+    color: var(--ds);
+    flex: 1 1 auto;
+    border-top: 1px dashed var(--mc);
+    padding-top: 0.5vh;
+    width: 11vw;
+    
+    margin-right: 3px;
+}
+
+
 
 .input-values {
     width: 4.5vw; 
     background-color: #fff7ed;
     border: none;
+    padding-right: 0;
 }
 
 .input-function {
@@ -261,16 +288,26 @@ h4 {
     border: none;
 }
 
+#function-mini-input {
+    width: 12vw;
+}
+
 .input-row {
     display: flex;
     justify-content: space-between;
-    width: 90%;
+    width: 100%;
+    padding: 1px 2px 0 2px;
 }
 
-#model-settings-1 {
-    width: 11.3vw;
+
+
+.invalid {
+    border: 2px solid red;
 }
 
+#config-title {
+    text-decoration: underline;
+}
 
 .markdown-config{
     font-family: "Roboto", serif;
@@ -397,11 +434,11 @@ h4 {
 }
 .option-columns-mlp {
     display: flex;
-    margin-left: 2vw;
+    margin-left: 0;
     flex-direction: row;
     font-size: 0.8em;
     justify-content: space-between;
-    width: 100%;
+    width: 80%;
 }
 
 #top-div-config{
@@ -423,10 +460,11 @@ div[id*='"type":"bregman-input"'], div[id*='"type":"loss-input"']{
     
 }
 
-div[id*='"type":"bregman-mini-input"']{
-    width: 50%;
-    padding-bottom: 10px;
+div[id*='"type":"bregman-mini-input"'], #preset-function-input{
+    width: 40%;
+    padding-bottom: 5px;
 }
+
 
 
 
@@ -494,7 +532,7 @@ div[id*='"type":"bregman-mini-input"']{
 }
 
 .configuration-options {
-    width: 30%;
+    width: 25%;
     padding: 5px;
     background: var(--da);
     border-radius: 5px;
