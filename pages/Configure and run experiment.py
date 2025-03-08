@@ -8,6 +8,7 @@ import torch
 import json 
 import base64
 import numpy as np
+from PresetFuncs import AnisotropicQuadratic, Rastrigin, Rosenbrock, SimplexObjective, Booth, Ackley
 
 dash.register_page(__name__, path="/run-experiment")
 
@@ -86,12 +87,27 @@ def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01
             html.Label("Initial value (X)"),
             dcc.Input(type="number", value=init_x, style={"marginBottom": "5px"},
                       className="input-values", id={"type": "initial-value-input", "index": idx}),
-        ], className="input-row"),
+        ], className="input-row", id={"type": "init-row", "index": idx}),
         html.Div([
             html.Label("Initial value (Y)"),
             dcc.Input(type="number", value=init_y, style={"marginBottom": "5px"},
                       className="input-values", id={"type": "initial-value-input-2", "index": idx}),
-        ], className="input-row"),
+        ], className="input-row", id={"type": "init-row-2", "index": idx}),
+        html.Div([
+            html.Label("Initial value (p1)"),
+            dcc.Input(type="number", value=0.2, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "simplex-initial-value-input", "index": idx}),
+        ], className="input-row hidden", id={"type": "simplex-init-row", "index": idx}),
+        html.Div([
+            html.Label("Initial value (p2)"),
+            dcc.Input(type="number", value=0.3, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "simplex-initial-value-input-2", "index": idx}),
+        ], className="input-row hidden", id={"type": "simplex-init-row-2", "index": idx}),
+        html.Div([
+            html.Label("Initial value (p3)"),
+            dcc.Input(type="number", value=0.5, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "simplex-initial-value-input-3", "index": idx}),
+        ], className="input-row hidden", id={"type": "simplex-init-row-3", "index": idx}),
         html.Div([
             html.Label("Iterations"),
             dcc.Input(type="number", value=iterations, style={"marginBottom": "5px"},
@@ -153,7 +169,12 @@ minimise_config = html.Div([html.Div([
             options=[
                 {"label": "Custom", "value": "CUSTOM"},
                 {"label": "Anisotropic", "value": "ANISO"},
-                {"label": "3D Simplex", "value": "SIMPLEX"}
+                {"label": "3D Simplex", "value": "SIMPLEX"},
+                {"label": "Rosenbrock", "value": "ROSENBROCK"},
+                {"label": "Rastrigin", "value": "RASTRIGIN"},
+                {"label": "Booth", "value": "BOOTH"},
+                {"label": "Ackley", "value": "ACKLEY"},
+                
             ]    
         , id="preset-function-input",className="dropdown", value="CUSTOM")
     ], className = "input-row"),
@@ -327,7 +348,7 @@ layout = html.Div([
 
 
 
-
+# callback to hide/show necessary/optional inputs for each function preset
 @callback(
     Output("a-input-row", "className"),
     Output("b-input-row", "className"),
@@ -348,11 +369,36 @@ def add_preset_variable_inputs(preset_function):
     if preset_function == "ANISO":
         return ["input-row"]*5 + ["input-row hidden"]*6 + ["a*(x - optx)**2 + b*(y-opty)"]
     elif preset_function == "SIMPLEX":
-        return ["input-row hidden"]*5 + ["input-row"]*6 + ["sum(q * log(q / p))"]
+        return ["input-row hidden"]*4 + ["input-row"] + ["input-row hidden"]*3 + ["input-row"]*3 + ["sum(q * log(q / p))"]
+    elif preset_function == "ROSENBROCK":
+        return ["input-row"]*2 + ["input-row hidden"]*2 + ["input-row"] + ["input-row hidden"]*6 + ["(a - x)**2 + b*(y - x**2)**2"]
+    elif preset_function == "RASTRIGIN":
+        return ["input-row hidden"]*4 + ["input-row"] + ["input-row hidden"]*6 + ["20 + (x**2 - 10*cos(2*pi*x)) + (y**2 - 10*cos(2*pi*y))"]
+    elif preset_function == "BOOTH":
+        return ["input-row hidden"]*4 + ["input-row"] + ["input-row hidden"]*6 + ["(x + 2*y - 7)**2 + (2*x + y -5)**2"]
+    elif preset_function == "ACKLEY":
+        return ["input-row hidden"]*4 + ["input-row"] + ["input-row hidden"] + ["-20*e(-0.2*sqrt(0.5*(x**2 + y**2))) - e(0.5*(cos(2*pi*x) + cos(2*pi*y))) + e + 20"]
     elif preset_function == "CUSTOM":
         return ["input-row hidden"]*5 + ["input-row hidden"]*6 + ["X**2 + Y**2"]
     else:
         return no_update
+
+# shows/hides initial value inputs for simplex/others
+# simplex needs 3 p inputs while all of the others just need x, y inputs
+@callback(
+    Output({"type": "init-row", "index": ALL}, "className"),
+    Output({"type": "init-row-2", "index": ALL}, "className"),
+    Output({"type": "simplex-init-row", "index": ALL}, "className"),
+    Output({"type": "simplex-init-row-2", "index": ALL}, "className"),
+    Output({"type": "simplex-init-row-3", "index": ALL}, "className"),
+    State("num-experiments-min", "data"),
+    Input("preset-function-input", "value")
+)
+def update_init_rows(num_experiments, function_preset):
+    if function_preset == "SIMPLEX":
+        return ["input-row hidden"]*num_experiments, ["input-row hidden"]*num_experiments, ["input-row"]*num_experiments, ["input-row"]*num_experiments, ["input-row"]*num_experiments
+    else:
+        return ["input-row"]*num_experiments, ["input-row"]*num_experiments, ["input-row hidden"]*num_experiments, ["input-row hidden"]*num_experiments, ["input-row hidden"]*num_experiments
 
 
 
@@ -722,7 +768,49 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, objective_string, rang
     else: 
         return no_update
 
-
+# function takes in the current preset type (custom/rosenbrock/simplex etc..)
+# returns the correct objective function with correct initialisation parameters
+def get_objective_function(preset_value, objective_string, a, b, q1, q2, q3, optx, opty, noise_std=0.0):
+    if preset_value == "CUSTOM":
+        # use the function parser for custom functions to generate the lambda expression
+        parser = FunctionParser(objective_string)
+        return parser.string_to_lambda()  
+    else:
+        presets = {
+            "ANISO": lambda: AnisotropicQuadratic(a=float(a),
+                                                  b=float(b),
+                                                  optimum=torch.tensor([optx, opty]),
+                                                  noise_std=noise_std),
+            "SIMPLEX": lambda: SimplexObjective(weights=torch.tensor([q1, q2, q3]),
+                                                noise_std=noise_std),
+            "ROSENBROCK": lambda: Rosenbrock(a=float(a),
+                                             b=float(b),
+                                             noise_std=noise_std),
+            "RASTRIGIN": lambda: Rastrigin(noise_std=noise_std),
+            "BOOTH": lambda: Booth(noise_std=noise_std),
+            "ACKLEY": lambda: Ackley(noise_std=noise_std)
+        }
+        return presets[preset_value]()
+    
+# sets up the initial points for different function types and determines the dimension
+def setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3s):
+    if preset_function == "CUSTOM":
+            if second_input_bool[0]==False:
+                inits = [[float(x), float(y)] for x, y in zip(init_x, init_y)]
+                print("?")
+                dim = 2
+                test = [1, 2]
+            else: 
+                inits = [float(x) for x in init_x]
+                dim = 1
+                test = 1
+    elif preset_function == "SIMPLEX":
+        inits = [[float(p1), float(p2), float(p3)] for p1, p2, p3 in zip(p1s, p2s, p3s)]
+        dim = 3
+    else:
+        inits = [[float(x), float(y)] for x, y in zip(init_x, init_y)]
+        dim = 2
+    return inits, dim
         
 # run a minimisation experiment, taking in single or multiple experiment configurations
 # overlays the graphs to directly compare results immediately
@@ -741,31 +829,38 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, objective_string, rang
     State("num-experiments-min", "data"),
     State({"type": "initial-value-input-2", "index": ALL}, "disabled"),
     State("Q-store", "data"),
+    State({"type": "simplex-initial-value-input", "index": ALL}, "value"),
+    State({"type": "simplex-initial-value-input-2", "index": ALL}, "value"),
+    State({"type": "simplex-initial-value-input-3", "index": ALL}, "value"),
+    State("q1-input", "value"),
+    State("q2-input", "value"),
+    State("q3-input", "value"),
+    State("a-input", "value"),
+    State("b-input", "value"),
+    State("optim-x-input", "value"),
+    State("optim-y-input", "value"),
+    State("noise-input", "value"),
+    State("preset-function-input", "value"),
     prevent_initial_call=True,
     allow_duplicate=True,
     suppress_callback_exceptions=True
     
 )
-def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter, lr, bregman, num_experiments, second_input_bool, q_store):
+def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter,
+                            lr, bregman, num_experiments, second_input_bool, q_store,
+                            p1s, p2s, p3s, q1, q2, q3, a, b, optx, opty, noise_std, preset_function):
     if n_clicks != 0:
         # parse objective function from string 
         print(second_input_bool)
         print(f"inputted initials {init_x} {init_y}")
         
-        if second_input_bool[0]==False:
-            inits = [[float(x), float(y)] for x, y in zip(init_x, init_y)]
-            print("?")
-            dim = 2
-            test = [1, 2]
-        else: 
-            inits = [float(x) for x in init_x]
-            dim = 1
-            test = 1
+        # defines the inits variable for 3 cases:  either 1d/2d custom functions, simplex functions, rest of preset functions (all 2d)
+        inits, dim = setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3s)
         print(inits)
         print(init_y)
-        parser = FunctionParser(objective_string)
         
-        objective = parser.string_to_lambda()
+        objective = get_objective_function(preset_function, objective_string, a, b, q1, q2, q3, optx, opty, noise_std=noise_std)
+    
         print(q_store)
         # instantiate experiment object
         experiment = ExperimentMD(objective, bregman=bregman[0], Q=torch.tensor(q_store[0][0], dtype=torch.float32), Q_inv=torch.tensor(q_store[0][1], dtype=torch.float32))
@@ -1147,48 +1242,6 @@ def load_experiment(load_clicks, contents, filename, current_children):
         return new_children, new_experiment_results, no_update, num_experiments, num_experiments, "config-button-clicked", "config-button", "approximate", "option-columns-mlp hidden", "option-columns-mlp"
 
 
-# function directs the loading of a saved experiment
-# if the experiment is a minimise experiment, but the current settings are for approximation experiments,
-# trigger update_experiment callback by incrementing min_clicks so the correct initial experiment settings are visible
-# vice versa
-# @callback(
-#     Output("min-button", "n_clicks"),
-#     Output("approx-button", "n_clicks"),
-#     Output("load-min", "data"),
-#     Output("load-approx", "data"),
-#     Input("upload-load", "n_clicks"),
-#     State("experiment-settings-type", "data"),
-#     State("min-button", "n_clicks"),
-#     State("approx-button", "n_clicks"),
-#     State("upload-config", "contents")
-# )
-# def direct_load_callback(load_clicks, experiment_type, min_clicks, approx_clicks, contents):
-#     triggered = callback_context.triggered
-#     if not triggered:
-#         return no_update
-    
-#     triggered_id = triggered[0]["prop_id"]
-#     if triggered_id != "upload-load.n_clicks" or load_clicks == 0:
-#         return no_update, no_update
-
-#     content_type, content_string = contents.split(',')
-#     decoded = base64.b64decode(content_string)
-#     saved_experiment = json.loads(decoded.decode("utf-8"))
-
-#     json_experi_type = saved_experiment.get("configuration").get("experiment_type")
-
-#     print(json_experi_type)
-#     if experiment_type == json_experi_type:
-#         if experiment_type == "minimise":
-#             return no_update, no_update, True, False
-#         elif experiment_type == "approximate":
-#             return no_update, no_update, False, True
-#     elif json_experi_type == "minimise":
-#         print("?")
-#         return min_clicks+1, no_update, True, False
-#     elif json_experi_type == "approximate":
-#         return no_update, approx_clicks+1, False, True
-    
 
 
 

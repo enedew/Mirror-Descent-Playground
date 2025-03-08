@@ -241,14 +241,20 @@ class Graphs():
             return self.approximation_graph
         else: 
             raise ValueError("approximation graph does not exist.")
-        
-    def create_optimisation_path_graph(self, minimisation_guesses, objective, dim ):
+    
+    def barycentric_to_cartesian(self,p):
+        # p is a list/array of three elements (p1, p2, p3) with p1+p2+p3=1
+        # using vertices: a=(0,0), b=(1,0), c=(0.5, sqrt(3)/2)
+        x = p[1] + 0.5 * p[2]
+        y = (3**0.5)/2 * p[2]
+        return x, y
+
+
+    def create_optimisation_path_graph(self, minimisation_guesses, objective, dim):
         self.optimisation_path_graph = plotly.Figure()
         self.trajectories.append(minimisation_guesses)
         print(minimisation_guesses[:10])
         
-        # generating a line for the objective function
-
         if dim == 1: 
             y_values_guess = [objective(torch.tensor(x)) for x in minimisation_guesses]
             x_line = np.linspace(min(minimisation_guesses)-5, max(minimisation_guesses)+5, 500)
@@ -258,12 +264,9 @@ class Graphs():
                 y=y_line,
                 mode='lines',
                 opacity=0.4,
-                name='Objective Function',
+                name='objective function',
                 line=dict(color="black")
             ))
-
-
-            # plotting the guesses
             self.optimisation_path_graph.add_trace(plotly.Scatter(
                 x=minimisation_guesses,
                 y=y_values_guess,
@@ -273,50 +276,38 @@ class Graphs():
                 name="(1)",
                 opacity=0.5
             ))
-
             self.optimisation_path_graph.update_layout(
-                title='Optimisation Path',
+                title='Primal Space Optimisation Trajectory',
                 xaxis_title='x',
                 yaxis_title='f(x)',
-                font=dict(
-                    family="Roboto",
-                    color="black"
-                ),
-                legend=dict(
-                orientation="h",   
-                yanchor="bottom",  
-                y=1.02,             
-                xanchor="right",   
-                x=1,
-                ),
+                font=dict(family="roboto", color="black"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 plot_bgcolor="#f2e9dd",
                 paper_bgcolor="#f2e9dd"
             )
-        else: 
-
+        elif dim == 2:
             x_bounds, y_bounds = self.compute_dynamic_range(self.trajectories, padding_ratio=0.2)
             x_range = np.linspace(x_bounds[0], x_bounds[1], 200)
-            y_range = np.linspace(y_bounds[0], y_bounds[1])
-
+            y_range = np.linspace(y_bounds[0], y_bounds[1], 200)
             X, Y = np.meshgrid(x_range, y_range)
-
-            Z = np.array([[objective(torch.tensor(x), torch.tensor(y)) for x, y in zip(X_row, Y_row)] for X_row, Y_row in zip(X, Y)])
-                
+            Z = np.array([[objective(*torch.tensor([x, y], dtype=torch.float32)).item() 
+                            for x, y in zip(X_row, Y_row)] 
+                        for X_row, Y_row in zip(X, Y)])
             x_vals = [p[0] for p in minimisation_guesses]
             y_vals = [p[1] for p in minimisation_guesses]
-            
             self.optimisation_path_graph.add_trace(plotly.Contour(
                 x=x_range,
                 y=y_range,
                 z=Z,
-                colorscale=[[0,"#f2e9dd"], [1,"#52432f"]],
+                colorbar=dict(
+                    title="f(x)"
+                ),
+                colorscale=[[0, "#f2e9dd"], [1, "#52432f"]],
                 contours=dict(showlabels=True, labelfont=dict(size=10)),
                 ncontours=40,
                 line=dict(color='rgba(82,67,47,0.7)', width=1),
                 hoverinfo='none'
             ))
-
-            
             self.optimisation_path_graph.add_trace(plotly.Scatter(
                 x=x_vals,
                 y=y_vals,
@@ -325,46 +316,134 @@ class Graphs():
                 marker=dict(size=2, color=self.line_colors[1], symbol='circle'),
                 name="(1)"
             ))
-
-          
             self.optimisation_path_graph.update_layout(
-                title='Optimisation Path',
+                title='optimisation path',
                 xaxis_title='x',
-                yaxis_title='f(x)',
+                yaxis_title='y',
                 template="plotly_white",
-                font=dict(
-                    family="Roboto",
-                    color="black"
-                ),
-                legend=dict(
-                orientation="h",   
-                yanchor="bottom",  
-                y=1.02,             
-                xanchor="right",   
-                x=1,
-                ),
+                font=dict(family="roboto", color="black"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 plot_bgcolor="#f2e9dd",
                 paper_bgcolor="#f2e9dd"
             )
+        elif dim == 3:
+            # for simplex problems, inputs are barycentrics; convert them to cartesian coordinates on an equilateral triangle
+            
+            # generate a grid in barycentrics: let u and v vary in [0,1] with u+v<=1; p3 = 1-u-v
+            u = np.linspace(0, 1, 100)
+            v = np.linspace(0, 1, 100)
+            U, V = np.meshgrid(u, v)
+            mask = U + V <= 1
+            P1 = U[mask]
+            P2 = V[mask]
+            P3 = 1 - P1 - P2
+            # convert scattered barycentrics to cartesian coordinates
+            points_cart = np.array([self.barycentric_to_cartesian([p1, p2, p3]) for p1, p2, p3 in zip(P1, P2, P3)])
+            xi = points_cart[:, 0]
+            yi = points_cart[:, 1]
+            # evaluate objective at these barycentric points
+            Z_scatter = np.array([objective(torch.tensor([p1, p2, p3], dtype=torch.float32)).item()
+                                for p1, p2, p3 in zip(P1, P2, P3)])
+            from scipy.interpolate import griddata
+            x_grid = np.linspace(xi.min(), xi.max(), 200)
+            y_grid = np.linspace(yi.min(), yi.max(), 200)
+            XI, YI = np.meshgrid(x_grid, y_grid)
+            ZI = griddata((xi, yi), Z_scatter, (XI, YI), method='linear')
+            
+            # clip z-values to focus on the central region of the simplex
+            valid_Z = ZI[~np.isnan(ZI)]
+            zmin = valid_Z.min()
+            zmax = valid_Z.max()
+            # choose a threshold so that only, say, the lower 40% of the range is used for contours
+            threshold = zmin + 0.2 * (zmax - zmin)
+            ZI_clipped = np.clip(ZI, zmin, threshold)
+            n_contours = 20
+            contour_step = (threshold - zmin) / n_contours
+            
+            self.optimisation_path_graph.add_trace(plotly.Contour(
+                x=x_grid,
+                y=y_grid,
+                z=ZI_clipped,
+                colorscale=[[0, "#f2e9dd"], [1, "#52432f"]],
+                contours=dict(
+                    showlabels=True,
+                    labelfont=dict(size=10),
+                    start=zmin,
+                    end=threshold,
+                    size=contour_step
+                ),
+                line=dict(color='rgba(82,67,47,0.7)', width=1),
+                hoverinfo='none'
+            ))
+            
+            # convert the minimisation guesses (which are in barycentrics) to cartesian coordinates
+            traj_cart = [self.barycentric_to_cartesian(p) for p in minimisation_guesses]
+            traj_x = [p[0] for p in traj_cart]
+            traj_y = [p[1] for p in traj_cart]
 
+            # make sure when hovering it shows the probabilities (barycentric) rather than
+            # the converted cartesian coordinates
+            hover_text = [f"p1={p[0]:.2f}, p2={p[1]:.2f}, p3={p[2]:.2f}" for p in minimisation_guesses]
+
+            # defining the vertices of the triangle so each one can 
+            # be labelled with the correct p1/p2/p3
+            vertices = {
+                "p=(1,0,0)": self.barycentric_to_cartesian([1, 0, 0]),
+                "p=(0,1,0)": self.barycentric_to_cartesian([0, 1, 0]),
+                "p=(0,0,1)": self.barycentric_to_cartesian([0, 0, 1])
+            }
+            annotations = []
+            for text, (x_val, y_val) in vertices.items():
+                annotations.append(dict(
+                    x=x_val,
+                    y=y_val,
+                    xref="x",
+                    yref="y",
+                    text=text,
+                    showarrow=True,
+                    arrowhead=2,
+                    ax=0,
+                    ay=-20,
+                    font=dict(color="black", size=12)
+                ))
+            
+            self.optimisation_path_graph.add_trace(plotly.Scatter(
+                x=traj_x,
+                y=traj_y,
+                mode='lines+markers',
+                line=dict(color=self.line_colors[1], width=1),
+                marker=dict(size=2, color=self.line_colors[1], symbol='circle'),
+                name="(1)",
+                hovertext=hover_text,
+                hovertemplate="%{hovertext}"
+            ))
+            
+            self.optimisation_path_graph.update_layout(
+                title='optimisation path',
+                xaxis_title='',
+                yaxis_title='',
+                template="plotly_white",
+                font=dict(family="roboto", color="black"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                plot_bgcolor="#f2e9dd",
+                paper_bgcolor="#f2e9dd",
+                annotations=annotations
+            )
         self.optimisation_path_graph.update_xaxes(
-        gridcolor= "#e8dac5",
-        linecolor= "#322634",
-        zerolinecolor="#e8dac5"
-        )
-
-        self.optimisation_path_graph.update_yaxes(
-            gridcolor= "#e8dac5",
-            linecolor= "#322634",
+            gridcolor="#e8dac5",
+            linecolor="#322634",
             zerolinecolor="#e8dac5"
-
         )
-
+        self.optimisation_path_graph.update_yaxes(
+            gridcolor="#e8dac5",
+            linecolor="#322634",
+            zerolinecolor="#e8dac5"
+        )
         return self.optimisation_path_graph
     
-    def add_optimisation_path(self, minimisation_guesses, objective, exp_number, dim ):
+    def add_optimisation_path(self, minimisation_guesses, objective, exp_number, dim):
         print("!")
-        if dim == 1: 
+        if dim == 1:
             y_values_guess = [objective(torch.tensor(x)) for x in minimisation_guesses]
             print("?")
             self.optimisation_path_graph.add_trace(plotly.Scatter(
@@ -376,7 +455,7 @@ class Graphs():
                 name=f"({exp_number})",
                 opacity=0.5
             ))
-        else: 
+        elif dim == 2:
             self.trajectories.append(minimisation_guesses)
             x_vals = [p[0] for p in minimisation_guesses]
             y_vals = [p[1] for p in minimisation_guesses]
@@ -389,34 +468,95 @@ class Graphs():
                 name=f"({exp_number})"
             ))
             self.update_contour(objective)
+        elif dim == 3:
+            # for simplex, convert barycentrics to cartesian
+            def bary_to_cart(p):
+                return self.barycentric_to_cartesian(p)
+            self.trajectories.append(minimisation_guesses)
+            traj_cart = [bary_to_cart(p) for p in minimisation_guesses]
+            x_vals = [pt[0] for pt in traj_cart]
+            y_vals = [pt[1] for pt in traj_cart]
+            hover_text = [f"p1={p[0]:.2f}, p2={p[1]:.2f}, p3={p[2]:.2f}" for p in minimisation_guesses]
 
-
+            self.optimisation_path_graph.add_trace(plotly.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode='lines+markers',
+                line=dict(color=self.line_colors[exp_number], width=1),
+                marker=dict(size=2, color=self.line_colors[exp_number], symbol='circle'),
+                name=f"({exp_number})",
+                hovertext=hover_text,
+                hovertemplate="%{hovertext}"
+            ))
+            # update the contour plot for the simplex if needed
+            # you might want to call your update_contour function here if it supports dim==3
         return self.optimisation_path_graph
+
     
     def create_dual_space_trajectory_graph(self, dual_logs, objective, dim):
-        
         self.dual_space_graph = plotly.Figure()
+        print("dual logs (first 10):", dual_logs[:10])
         
-        print("Dual logs (first 10):", dual_logs[:10])
-        
-        x_vals = [point[0] for point in dual_logs]
-        y_vals = [point[1] for point in dual_logs]
-        
-        
-        self.dual_space_graph.add_trace(plotly.Scatter(
-            x=x_vals,
-            y=y_vals,
-            mode='lines+markers',
-            line=dict(color=self.line_colors[1], width=2),
-            marker=dict(size=2, color=self.line_colors[1], symbol='circle'),
-            name="Dual Trajectory"
-        ))
-        
+        if dim == 1:
+            x_vals = [point for point in dual_logs]
+            self.dual_space_graph.add_trace(plotly.Scatter(
+                x=x_vals,
+                y=dual_logs,
+                mode='lines+markers',
+                line=dict(color=self.line_colors[1], width=2),
+                marker=dict(size=2, color=self.line_colors[1], symbol='circle'),
+                name="dual trajectory"
+            ))
+        elif dim == 2:
+            x_vals = [point[0] for point in dual_logs]
+            y_vals = [point[1] for point in dual_logs]
+            self.dual_space_graph.add_trace(plotly.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode='lines+markers',
+                line=dict(color=self.line_colors[1], width=2),
+                marker=dict(size=2, color=self.line_colors[1], symbol='circle'),
+                name="dual trajectory"
+            ))
+        elif dim == 3:
+            # for simplex problems im using a 3d scatter plot
+            # tried a ternary diagram, but dual space values can be negative for some divergences
+            # so in that case the trajectory isnt displayed properly
+            x_vals = [p[0] for p in dual_logs]
+            y_vals = [p[1] for p in dual_logs]
+            z_vals = [p[2] for p in dual_logs]
+            hover_text = [f"p1-dual={p[0]:.2f}<br>p2-dual={p[1]:.2f}<br>p3-dual={p[2]:.2f}" for p in dual_logs]
+            
+            self.dual_space_graph.add_trace(plotly.Scatter3d(
+                x=x_vals,
+                y=y_vals,
+                z=z_vals,
+                mode='lines+markers',
+                marker=dict(size=2, color=self.line_colors[1], symbol='circle'),
+                line=dict(color=self.line_colors[1], width=2),
+                name="dual trajectory",
+                hovertext=hover_text,
+                hovertemplate="%{hovertext}"
+            ))
+            
+            self.dual_space_graph.update_layout(
+                title='Dual Space Optimisation Trajectory',
+                scene=dict(
+                    xaxis_title='p1',
+                    yaxis_title='p2',
+                    zaxis_title='p3',
+                    bgcolor="#f2e9dd"
+                ),
+                paper_bgcolor="#f2e9dd",
+                font=dict(family="roboto", color="black")
+            )
+
+            return self.dual_space_graph
         self.dual_space_graph.update_layout(
-            title='Dual Space Optimisation Path',
-            xaxis_title='y[0]',
-            yaxis_title='y[1]',
-            font=dict(family="Roboto", color="black"),
+            title='Dual Space Optimisation Trajectory',
+            xaxis_title='x',
+            yaxis_title='y',
+            font=dict(family="roboto", color="black"),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             plot_bgcolor="#f2e9dd",
             paper_bgcolor="#f2e9dd"
@@ -431,14 +571,20 @@ class Graphs():
             linecolor="#322634",
             zerolinecolor="#e8dac5"
         )
-        
         return self.dual_space_graph
     
-    def add_dual_space_trajectory(self, dual_logs, exp_number):
-        
-        
-        if isinstance(dual_logs[0], (list, tuple, np.ndarray)) and len(dual_logs[0]) == 2:
-            
+    def add_dual_space_trajectory(self, dual_logs, exp_number, dim):
+        if dim == 1:
+            x_vals = [point for point in dual_logs]
+            self.dual_space_graph.add_trace(plotly.Scatter(
+                x=x_vals,
+                y=dual_logs,
+                mode='markers+lines',
+                marker=dict(size=2, color=self.line_colors[exp_number], symbol="circle"),
+                line=dict(color=self.line_colors[exp_number], width=2),
+                name=str(exp_number)
+            ))
+        elif dim == 2:
             x_vals = [point[0] for point in dual_logs]
             y_vals = [point[1] for point in dual_logs]
             self.dual_space_graph.add_trace(plotly.Scatter(
@@ -447,40 +593,30 @@ class Graphs():
                 mode='lines+markers',
                 line=dict(color=self.line_colors[exp_number], width=2),
                 marker=dict(size=2, color=self.line_colors[exp_number], symbol='circle'),
-                name=exp_number
+                name=str(exp_number)
+            ))
+        elif dim == 3:
+            x_vals = [p[0] for p in dual_logs]
+            y_vals = [p[1] for p in dual_logs]
+            z_vals = [p[2] for p in dual_logs]
+            
+            # create hover text to display the original barycentrics
+            hover_text = [f"p1-dual={p[0]:.2f}<br>p2-dual={p[1]:.2f}<br>p3-dual={p[2]:.2f}" for p in dual_logs]
+            
+            self.dual_space_graph.add_trace(plotly.Scatter3d(
+                x=x_vals,
+                y=y_vals,
+                z=z_vals,
+                mode='lines+markers',
+                marker=dict(size=3, color=self.line_colors[exp_number % len(self.line_colors)], symbol='circle'),
+                line=dict(color=self.line_colors[exp_number % len(self.line_colors)], width=2),
+                name=f"({exp_number})",
+                hovertext=hover_text,
+                hovertemplate="%{hovertext}",
+                visible=True
             ))
             
-            new_x_min = min(x_vals) - 1
-            new_x_max = max(x_vals) + 1
-            new_y_min = min(y_vals) - 1
-            new_y_max = max(y_vals) + 1
-            
-            current_x_range = self.dual_space_graph.layout.xaxis.range if self.dual_space_graph.layout.xaxis.range else [new_x_min, new_x_max]
-            current_y_range = self.dual_space_graph.layout.yaxis.range if self.dual_space_graph.layout.yaxis.range else [new_y_min, new_y_max]
-            new_x_min = min(new_x_min, current_x_range[0])
-            new_x_max = max(new_x_max, current_x_range[1])
-            new_y_min = min(new_y_min, current_y_range[0])
-            new_y_max = max(new_y_max, current_y_range[1])
-            self.dual_space_graph.update_xaxes(range=[new_x_min, new_x_max])
-            self.dual_space_graph.update_yaxes(range=[new_y_min, new_y_max])
-        else:
-            
-            self.dual_space_graph.add_trace(plotly.Scatter(
-                x=list(range(len(dual_logs))),
-                y=dual_logs,
-                mode='markers+lines',
-                marker=dict(size=2, color=self.line_colors[exp_number], symbol="circle"),
-                line=dict(color=self.line_colors[exp_number], width=2),
-                name=exp_number,
-                opacity=0.5
-            ))
-            
-            new_y_min = min(dual_logs) - 1
-            new_y_max = max(dual_logs) + 1
-            current_y_range = self.dual_space_graph.layout.yaxis.range if self.dual_space_graph.layout.yaxis.range else [new_y_min, new_y_max]
-            new_y_min = min(new_y_min, current_y_range[0])
-            new_y_max = max(new_y_max, current_y_range[1])
-            self.dual_space_graph.update_yaxes(range=[new_y_min, new_y_max])
+    
         
         return self.dual_space_graph
     
@@ -641,7 +777,7 @@ class Graphs():
         updated_optimisation = self.add_optimisation_path(minimisation_guesses=minimisation_guesses, objective=objective, exp_number=exp_number, dim=dim)
         updated_gradient =self.add_gradient_norm(gradient_logs=gradient_logs, exp_number=exp_number)
         updated_divergence = self.add_divergence(divergence_logs=divergence_logs, exp_number=exp_number)
-        updated_dual = self.add_dual_space_trajectory(dual_logs=dual_logs, exp_number=exp_number)
+        updated_dual = self.add_dual_space_trajectory(dual_logs=dual_logs, exp_number=exp_number, dim=dim)
         return updated_optimisation, updated_gradient, updated_divergence, updated_dual
 
     def update_all_graphs_approx(self, loss_logs, gradient_logs, divergence_logs, prediction_data, exp_number):

@@ -159,7 +159,10 @@ class ExperimentMD():
         # minimises an objective function using the MirrorDescent optimiser
         # first convert the starting point to a tensor
         self.minimisation_guesses.append(init)
-        print(init)
+        simplex = False
+        if isinstance(init, list):
+            if len(init) == 3: simplex = True
+
         x = torch.tensor(init, requires_grad=True)
         self.construct_optimiser([x], lr)
 
@@ -169,9 +172,13 @@ class ExperimentMD():
             current_scale = x.data.sum()
             normalized_x = x / current_scale
             
-            
-            y = self.objective(*x)
-            
+            print(x)
+
+            # for the 1d case where x is a 0d tensor and cannot iterate over with *x
+            if isinstance(init, list):
+                y = self.objective(*x)
+            else:
+                y = self.objective(x)
 
             y.backward()
 
@@ -185,7 +192,7 @@ class ExperimentMD():
                     old_params.append(param.data.clone())
             
             self.optimiser.step()
-            if self.bregman == "KL":
+            if self.bregman == "KL" or simplex:
                 x.data = x.data / x.data.sum()
             # calculate and record the bregman divergence between params of this iteration and the next
             self.calculate_record_bregman_divergence(old_params)
