@@ -1,5 +1,6 @@
 from dash import html, dcc, callback, Input, Output, State, callback_context, no_update, Patch, ALL
 import dash
+from dash.exceptions import PreventUpdate
 from Graphs import Graphs
 from Experiment import ExperimentMD
 from FunctionParser import FunctionParser
@@ -235,15 +236,23 @@ def construct_experiment_results(idx, metrics_dict):
             # skip arrays like step_sizes
             continue
         elif isinstance(value, float):
-            display_value = f"{value:.5f}"
+            if abs(value) > 1e6:
+                display_value = f"{value:.3e}"
+            else:
+                display_value = f"{value:.5f}"
             row_value = str(display_value)
         else:
             row_value = str(value)
         table_rows.append(
-            html.Tr([
-                html.Td(key, className="metric-name"),
-                html.Td(row_value, className="metric-value")
-            ])
+            html.Tr(
+                [
+                    html.Td(key, className="metric-name"),
+                    html.Td(row_value, className="metric-value")
+                ],
+                id={'type': 'metric-row', 'metric': key, 'table': idx},
+                n_clicks=0,
+                style={'cursor': 'pointer'}  # visually indicate that the row is clickable
+            )
         )
 
     return html.Div([
@@ -257,7 +266,48 @@ def construct_experiment_results(idx, metrics_dict):
     id={"type": "experiment-result", "index": idx})
 
 
+# callback determines which metrics have been selected for highlighting
+@callback(
+    Output("selected-metrics", "data"),
+    Input({'type': 'metric-row', 'metric': ALL, 'table': ALL}, 'n_clicks'),
+    State("selected-metrics", "data"),
+    prevent_initial_call=True,
+)
+def update_selected_metrics(n_clicks_list, selected_metrics):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+    
+    if all(n == 0 for n in n_clicks_list):
+        raise PreventUpdate
+    
+    triggered_id = json.loads(ctx.triggered[0]["prop_id"].split('.')[0])
+    metric = triggered_id['metric']
 
+    
+    if metric in selected_metrics:
+        selected_metrics.remove(metric)
+    else:
+        selected_metrics.append(metric)
+    return selected_metrics
+
+
+# callback highlights any selected metrics for comparison
+@callback(
+    Output({'type': 'metric-row', 'metric': ALL, 'table': ALL}, 'style'),
+    Input("selected-metrics", "data"),
+    State({'type': 'metric-row', 'metric': ALL, 'table': ALL}, 'id')
+)
+def update_row_styles(selected_metrics, ids):
+    new_styles = []
+    
+    for component_id in ids:
+        base_style = {'cursor': 'pointer'}  
+        if component_id['metric'] in selected_metrics:
+            new_styles.append({**base_style, 'backgroundColor': '#a2bab2'})
+        else:
+            new_styles.append(base_style)
+    return new_styles
 
 # placeholder variables to be updated via callback
 minimise_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-minimise")
@@ -312,7 +362,7 @@ approx_save_clicks_store = dcc.Store(id="approx-save-clicks", data=0)
 # stores the current number of approx/mini button clicks 
 global_approx_clicks_store = dcc.Store(id="approx-clicks", data=0)
 global_min_clicks_store = dcc.Store(id="min-clicks", data=0)
-
+selected_metrics_store = dcc.Store(id="selected-metrics", data=[])
 # stores the currently inputted Q matrices as tensors for use in experiment callbacks
 Q_store = dcc.Store(id="Q-store", data=None)
 
@@ -371,7 +421,8 @@ layout = html.Div([
     load_min_bool,
     load_approx_bool,
     Q_store,
-    dim_store
+    dim_store,
+    selected_metrics_store
     
 ], style={"padding": "5px 20px 20px 20px"})
 
@@ -612,19 +663,28 @@ def update_batch_size(num_samples):
     return num_samples
 
 # callback to add input field for positive definite matrix Q when mahalanobis distance is selected
+# also sets default value of Q to correct dims depending on the problem selected - 3x3 for simplex or 2x2 for 2D functions
 @callback(
     Output({"type": "Q-input-row", "index": ALL}, "className"),
-    Input({"type": "bregman-mini-input", "index": ALL}, "value")
+    Output({"type": "Q-input", "index": ALL}, "value"),
+    Input({"type": "bregman-mini-input", "index": ALL}, "value"),
+    Input("preset-function-input", "value")
 )
-def show_Q_input(bregman_fields):
+def show_Q_input(bregman_fields, function_preset):
     new_q_input_classes = []
+    q_default_values = []
     for i in range(len(bregman_fields)):
         if bregman_fields[i] == "MAHALANOBIS":
             new_q_input_classes.append("input-row")
         else:
             new_q_input_classes.append("input-row hidden")
+        if function_preset == "SIMPLEX": 
+            q_default_values.append("3, 0, 0, 0, 3, 0, 0, 0, 3")
+        else:
+            q_default_values.append(no_update)
 
-    return new_q_input_classes
+
+    return new_q_input_classes, q_default_values
 
 # callback to check if the input for the above is positive definite, shows invalid input with red border if not
 @callback(
@@ -801,7 +861,7 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, objective_string, rang
 
         loss_fig = graph.create_loss_curve(experiment.loss_logs)
         gradient_fig = graph.create_gradient_norm_graph(experiment.gradient_logs)
-        divergence_fig = graph.create_divergence_graph(experiment.divergence_logs)
+        divergence_fig = graph.create_divergence_graph(experiment.avg_divergence_logs)
         results_fig = graph.create_function_approximation_plot(experiment.prediction_data)
 
         for i in range(1, num_experiments):
@@ -814,7 +874,7 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, objective_string, rang
                                        neurons[i], epochs[i], float(lr[i]))
             # update graphs
             loss_fig, gradient_fig, divergence_fig, results_fig = graph.update_all_graphs_approx(experiment.loss_logs, experiment.gradient_logs,
-                                                                                                 experiment.divergence_logs, experiment.prediction_data, i+1)
+                                                                                                 experiment.avg_divergence_logs, experiment.prediction_data, i+1)
         
         experiments_dict = create_experiment_dict_approx(num_experiments, layers, neurons, epochs, batch_size, lr, bregman, loss)
         experiment_state = {

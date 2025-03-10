@@ -6,7 +6,6 @@ import numpy as np
 dash.register_page(__name__, path="/")
 
 mirror_descent_markdown = r"""
-### What is Mirror Descent?
 **Mirror Descent** is an optimisation algorithm that extends gradient descent to non-Euclidean geometries by utilising different **distance-generating functions**, each of which induce their own **Bregman Divergence**.
 
 Say we are trying to minimise some convex function. We have a point $x_k$, the subgradient at this point $g_k$,
@@ -36,7 +35,6 @@ $$
 """
 
 algo_markdown = r"""
-### What are Bregman Divergences? 
 Bregman Divergences are a family of distance measuring functions, defined in terms of a strictly convex and differentiable function. The most basic, and most well-known example
 of a Bregman Divergence is the squared Euclidean distance. Indeed, when the chosen bregman divergence for mirror descent is given as the Euclidean distance, this yields the standard
 Gradient Descent algorithm.
@@ -56,6 +54,7 @@ $$
 layout = html.Div([
     # first row div - description of the mirror descent algorithm 
     html.Div([
+        html.H3("What is Mirror Descent?"),
         dcc.Markdown(mirror_descent_markdown, mathjax=True,className="padding-markdown")
     ], className="mirror-desc"),
 
@@ -63,6 +62,7 @@ layout = html.Div([
     html.Div([
         # first column, description and sliders
         html.Div([
+            html.H3("What are Bregman Divergences?"),
             dcc.Markdown(algo_markdown, mathjax=True, className="padding-markdown"),
             html.Div([
                 html.Div([
@@ -92,7 +92,7 @@ layout = html.Div([
 
         # second column - graph visualisation of bregmans
         html.Div([
-            dcc.Markdown("### Visualising the Bregman Divergence for the Euclidean norm $\phi=||x||^2$ (squared Euclidean distance)", mathjax=True, className="padding-markdown"),
+            dcc.Markdown("### Visualising the Bregman Divergence for the Euclidean norm $\phi=||x||^2$ (squared Euclidean distance)", mathjax=True, className="graph-header"),
             dcc.Graph(
                 id="interactive-bregman-fig",
                 config={'responsive': True},
@@ -101,10 +101,6 @@ layout = html.Div([
             )
         ], className="bregman-graph-interactive")
     ], className="bregman-visual"),
-
-    html.Div([
-
-    ], className="mirror-map-visualisation")
 
 
 ], className="info-page-layout")

@@ -437,7 +437,10 @@ class ExperimentMD():
                 if self.iteration_of_convergence is None:
                     self.iteration_of_convergence = i
 
-                    print(f"Tolerance reached at iteration {i}")
+                    print(f"Tolerance reached at iteration {i}, terminating run")
+                    self.calculate_record_average_bregman_divergence(old_params, self.bregman)
+                    self.minimisation_guesses.append(x.detach().cpu().numpy().copy())
+                    break
 
             # calculate and record the bregman divergence between params of this iteration and the next
             self.calculate_record_average_bregman_divergence(old_params, self.bregman)
