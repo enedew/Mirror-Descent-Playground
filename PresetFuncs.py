@@ -30,9 +30,10 @@ class ObjectiveFunction(ABC):
             x_tensor = torch.stack(x)
         else:
             # else create new tensor from the inputs
-            x_tensor = torch.tensor(x, dtype=torch.float32)
+            x_tensor = torch.tensor(x, dtype=torch.float64)
         value = self._compute(x_tensor)
         if self.noise_std > 0:
+            x_tensor = x_tensor.to(torch.float64)
             noise = torch.randn(1, dtype=x_tensor.dtype, device=x_tensor.device) * self.noise_std
             value = value + noise
         return value

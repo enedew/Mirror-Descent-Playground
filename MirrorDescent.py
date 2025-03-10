@@ -61,6 +61,7 @@ class MirrorDescent(Optimizer):
         super().__init__(params, defaults)
     
     def step(self, closure=None):
+        
         for group in self.param_groups:
             lr = group['lr']
             # loop through each parameter

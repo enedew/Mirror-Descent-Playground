@@ -13,7 +13,6 @@ from PresetFuncs import AnisotropicQuadratic, Rastrigin, Rosenbrock, SimplexObje
 dash.register_page(__name__, path="/run-experiment")
 
 explanation_md = r"""
-### Running an experiment 
 Here you can configure and run your own experiments with the mirror descent algorithm.
 There are two different types of experiments available: 
 * Minimising an objective function using mirror descent.
@@ -21,7 +20,6 @@ There are two different types of experiments available:
 """
 
 loading_md = r"""
-### Loading experiments
 There are several pre-configured experiments which you can load. Alternatively you have the option to save experiments after running,
 and upload the configuration to run again.
 """
@@ -80,7 +78,7 @@ def construct_model_settings(idx, layers=2, neurons=10, epochs=2000):
     ], className="input-row"),
 ], className="model-settings-left", id=f"model-settings-{idx}")
 
-def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01, bregman="EUCLID"):
+def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01, p1=0.2, p2=0.3, p3=0.5, Q="2, 0, 0, 1", bregman="EUCLID"):
     return html.Div([
         dcc.Markdown(f"**Algorithm parameters ({idx})**"),
         html.Div([
@@ -95,17 +93,17 @@ def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01
         ], className="input-row", id={"type": "init-row-2", "index": idx}),
         html.Div([
             html.Label("Initial value (p1)"),
-            dcc.Input(type="number", value=0.2, style={"marginBottom": "5px"},
+            dcc.Input(type="number", value=p1, style={"marginBottom": "5px"},
                       className="input-values", id={"type": "simplex-initial-value-input", "index": idx}),
         ], className="input-row hidden", id={"type": "simplex-init-row", "index": idx}),
         html.Div([
             html.Label("Initial value (p2)"),
-            dcc.Input(type="number", value=0.3, style={"marginBottom": "5px"},
+            dcc.Input(type="number", value=p2, style={"marginBottom": "5px"},
                       className="input-values", id={"type": "simplex-initial-value-input-2", "index": idx}),
         ], className="input-row hidden", id={"type": "simplex-init-row-2", "index": idx}),
         html.Div([
             html.Label("Initial value (p3)"),
-            dcc.Input(type="number", value=0.5, style={"marginBottom": "5px"},
+            dcc.Input(type="number", value=p3, style={"marginBottom": "5px"},
                       className="input-values", id={"type": "simplex-initial-value-input-3", "index": idx}),
         ], className="input-row hidden", id={"type": "simplex-init-row-3", "index": idx}),
         html.Div([
@@ -134,7 +132,7 @@ def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01
         ], className="input-row"),
         html.Div([
             html.Label("Positive Definite Matrix"),
-            dcc.Input(type="text", value="2, 0, 0, 1", step=0.001, min=0, style={"marginBottom": "5px"},
+            dcc.Input(type="text", value=Q, step=0.001, min=0, style={"marginBottom": "5px"},
                       className="input-function", id={"type": "Q-input", "index": idx}),
         ], className="input-row", id={"type": "Q-input-row", "index": idx})
     ], className="settings", id={"type": "minimise-settings", "index": idx})
@@ -203,18 +201,6 @@ minimise_config = html.Div([html.Div([
         dcc.Input(type="number", value=0.0, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="noise-input")
     ], className="input-row hidden", id="noise-input-row"),
     html.Div([
-        html.Label("Initial p1"),
-        dcc.Input(type="number", value=0.3, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="p1-input")
-    ], className="input-row hidden", id="p1-input-row"),
-    html.Div([
-        html.Label("Initial p2"),
-        dcc.Input(type="number", value=0.2, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="p2-input")
-    ], className="input-row hidden", id="p2-input-row"),
-    html.Div([
-        html.Label("Initial p3"),
-        dcc.Input(type="number", value=0.5, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="p3-input")
-    ], className="input-row hidden", id="p3-input-row"),
-    html.Div([
         html.Label("Target q1"),
         dcc.Input(type="number", value=0.1, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q1-input")
     ], className="input-row hidden", id="q1-input-row"),
@@ -234,7 +220,41 @@ approx_config = html.Div([
                 id="approx-config", className="option-columns-mlp hidden")
 
 
+metrics_data = [
+    {"name": "Objective Value", "value": 0.2345},
+    {"name": "Gradient Norm", "value": 0.000123},
+    {"name": "Bregman Divergence", "value": 1.234e-5},
+]
 
+def construct_experiment_results(idx, metrics_dict):
+       # function converts the metrics_dict into a table
+    table_rows = []
+    for key, value in metrics_dict.items():
+        
+        if isinstance(value, list):
+            # skip arrays like step_sizes
+            continue
+        elif isinstance(value, float):
+            display_value = f"{value:.5f}"
+            row_value = str(display_value)
+        else:
+            row_value = str(value)
+        table_rows.append(
+            html.Tr([
+                html.Td(key, className="metric-name"),
+                html.Td(row_value, className="metric-value")
+            ])
+        )
+
+    return html.Div([
+        html.H4(f"Experiment {idx} results", className="experiment-header"),
+        html.Table(
+            className="metrics-table",
+            children=[html.Tbody(table_rows)]
+        )
+    ],
+    className="experiment-result",
+    id={"type": "experiment-result", "index": idx})
 
 
 
@@ -252,7 +272,10 @@ approximate_remove_button = html.Button("-", className="add-button", id="remove-
 
 
 run_button_container = html.Div([minimise_run_button, minimise_add_button, minimise_remove_button, approximate_run_button , minimise_save_button, approximate_add_button, approximate_remove_button, approximate_save_button], id="run-button-container")
-experiment_results = html.Div([], id="experiment-output", className="experiment-graphs")
+experiment_figs = html.Div([], id="experiment-output", className="experiment-graphs")
+experiment_results = html.Div([
+    html.H3("Metrics", id="metrics-header"),
+], id="experiment-metrics", className="experiment-metrics")
 experiment_settings_type_store = dcc.Store(id="experiment-settings-type", data="minimise")
 
 config_options = html.Div([
@@ -293,13 +316,17 @@ global_min_clicks_store = dcc.Store(id="min-clicks", data=0)
 # stores the currently inputted Q matrices as tensors for use in experiment callbacks
 Q_store = dcc.Store(id="Q-store", data=None)
 
+# dim store 
+dim_store = dcc.Store(id="dim-store", data=1)
 
 layout = html.Div([
     html.Div([
         html.Div([
+            html.H3("Running an Experiment"),
             dcc.Markdown(explanation_md, className="padding-markdown")
         ], className="experiment-desc"),
         html.Div([
+            html.H3("Loading Experiments"),
             dcc.Markdown(loading_md, className="padding-markdown"),
             html.Div([
                 html.Div([
@@ -328,6 +355,7 @@ layout = html.Div([
     ,
     html.Div([
         config_options,
+        experiment_figs,
         experiment_results
     ], className= "experiment-div"),
     experiment_settings_type_store,
@@ -342,7 +370,8 @@ layout = html.Div([
     approx_save_clicks_store,
     load_min_bool,
     load_approx_bool,
-    Q_store
+    Q_store,
+    dim_store
     
 ], style={"padding": "5px 20px 20px 20px"})
 
@@ -355,31 +384,29 @@ layout = html.Div([
     Output("optim-x-input-row", "className"),
     Output("optim-y-input-row", "className"),
     Output("noise-input-row", "className"),
-    Output("p1-input-row", "className"),
-    Output("p2-input-row", "className"),
-    Output("p3-input-row", "className"),
     Output("q1-input-row", "className"),
     Output("q2-input-row", "className"),
     Output("q3-input-row", "className"),
     Output("function-mini-input", "value"),
     Input("preset-function-input", "value"),
+    Input("config-options", "children"),
     prevent_initial_call=True
 )
-def add_preset_variable_inputs(preset_function):
+def add_preset_variable_inputs(preset_function, children):
     if preset_function == "ANISO":
-        return ["input-row"]*5 + ["input-row hidden"]*6 + ["a*(x - optx)**2 + b*(y-opty)"]
+        return ["input-row"]*5 + ["input-row hidden"]*3 + ["a*(x - optx)**2 + b*(y-opty)"]
     elif preset_function == "SIMPLEX":
-        return ["input-row hidden"]*4 + ["input-row"] + ["input-row hidden"]*3 + ["input-row"]*3 + ["sum(q * log(q / p))"]
+        return ["input-row hidden"]*4 + ["input-row"] + ["input-row"]*3 + ["sum(q * log(q / p))"]
     elif preset_function == "ROSENBROCK":
-        return ["input-row"]*2 + ["input-row hidden"]*2 + ["input-row"] + ["input-row hidden"]*6 + ["(a - x)**2 + b*(y - x**2)**2"]
+        return ["input-row"]*2 + ["input-row hidden"]*2 + ["input-row"] + ["input-row hidden"]*3 + ["(a - x)**2 + b*(y - x**2)**2"]
     elif preset_function == "RASTRIGIN":
-        return ["input-row hidden"]*4 + ["input-row"] + ["input-row hidden"]*6 + ["20 + (x**2 - 10*cos(2*pi*x)) + (y**2 - 10*cos(2*pi*y))"]
+        return ["input-row hidden"]*4 + ["input-row"] + ["input-row hidden"]*3 + ["20 + (x**2 - 10*cos(2*pi*x)) + (y**2 - 10*cos(2*pi*y))"]
     elif preset_function == "BOOTH":
-        return ["input-row hidden"]*4 + ["input-row"] + ["input-row hidden"]*6 + ["(x + 2*y - 7)**2 + (2*x + y -5)**2"]
+        return ["input-row hidden"]*4 + ["input-row"] + ["input-row hidden"]*3 + ["(x + 2*y - 7)**2 + (2*x + y -5)**2"]
     elif preset_function == "ACKLEY":
         return ["input-row hidden"]*4 + ["input-row"] + ["input-row hidden"] + ["-20*e(-0.2*sqrt(0.5*(x**2 + y**2))) - e(0.5*(cos(2*pi*x) + cos(2*pi*y))) + e + 20"]
     elif preset_function == "CUSTOM":
-        return ["input-row hidden"]*5 + ["input-row hidden"]*6 + ["X**2 + Y**2"]
+        return ["input-row hidden"]*5 + ["input-row hidden"]*3 + ["X**2 + Y**2"]
     else:
         return no_update
 
@@ -529,6 +556,51 @@ def disable_enable_remove_button_approximate(num_experiments):
     else: 
         return True
 
+@callback(
+    Output("dim-store", "data"),
+    Input("preset-function-input", "value"),
+    Input({"type": "initial-value-input-2", "index": ALL}, "disabled")
+)
+def update_dim_store(preset_function, second_input_bool):
+    if preset_function == "CUSTOM":
+        if second_input_bool[0] == True:
+            return 1
+        else:
+            return 2
+    elif preset_function == "SIMPLEX":
+        return 3 
+
+# callback to disabled function input if preset is not custom
+@callback(
+    Output("function-mini-input", "disabled"),
+    Input("preset-function-input", "value")
+)
+def disable_function_input(function_preset):
+    if function_preset != "CUSTOM":
+        return True
+    else:
+        return False
+
+# disables mahalanobis for 1d custom functions, causes error with the mirror map attempting to matmul with a 0d scalar (Q in the 1d case)
+@callback(
+    Output({"type": "bregman-mini-input", "index": ALL}, "options"),
+    Input("dim-store", "data"),
+    State("num-experiments-min", "data")
+)
+def manage_bregman_options(current_dim, num_experiments):
+    base_options = [
+        {"label": "Euclidean", "value": "EUCLID"},
+        {"label": "KL", "value": "KL"},
+        {"label": "Mahalanobis", "value": "MAHALANOBIS"},
+        {"label": "Itakura-Saito", "value": "ITAKURA-SAITO"}
+    ]
+    if current_dim == 1:
+        for opt in base_options:
+            if opt["value"] == "MAHALANOBIS":
+                
+                opt["disabled"] = True
+    return [base_options]*num_experiments
+
 
 # assumes batch mirror descent, and automatically sets the batch size to be equal to the number of samples
 # if user changes the batch size for mirror descent it shouldn't change back unless the sample number is changed
@@ -559,32 +631,41 @@ def show_Q_input(bregman_fields):
     Output({"type": "Q-input", "index": ALL}, "className"),
     Output("Q-store", "data"),
     Input({"type": "Q-input", "index": ALL}, "value"),
-    State({"type": "Q-input-row", "index": ALL}, "className")
+    State({"type": "Q-input-row", "index": ALL}, "className"),
+    Input("preset-function-input", "value")
 )
-def check_positive_definite(input_values, total_input_components):
+def check_positive_definite(input_values, total_input_components, preset_function):
     classnames = []
     qs = []
-    for input in input_values:
-        try: 
-            numbers = list(map(float, input.split(',')))
+    if preset_function == "SIMPLEX":
+        dim = 3
+    else:
+        dim = 2
+    for input_str in input_values:
+        try:
+            numbers = list(map(float, input_str.split(',')))
             print("matrix nums: ", numbers)
-            if len(numbers) != 4:
-                classnames.append("input-function invalid")
-                qs.append([None, None]) 
-            else: 
-                matrix = np.array(numbers).reshape((2, 2))
 
+            required_count = dim * dim
+            if len(numbers) != required_count:
+                classnames.append("input-function invalid")
+                qs.append([None, None])
+            else:
+                matrix = np.array(numbers).reshape((dim, dim))
+                # ensuring positivity in eigenvalues
                 if np.all(np.linalg.eigvals(matrix) > 0):
-                    classnames.append("input-function") 
-                    Q = torch.tensor(matrix)
+                    classnames.append("input-function")
+                    Q = torch.tensor(matrix, dtype=torch.float64)
                     Q_inv = torch.linalg.inv(Q)
                     qs.append([Q.tolist(), Q_inv.tolist()])
                 else:
                     classnames.append("input-function invalid")
-                    qs.append([None, None]) 
-        except Exception: 
+                    qs.append([None, None])
+
+        except Exception:
             classnames.append("input-function invalid")
-            qs.append([None, None]) 
+            qs.append([None, None])
+
     return classnames, qs
 
 
@@ -748,7 +829,7 @@ def run_experiment_mlp(n_clicks, layers, neurons, epochs, objective_string, rang
             "results": {
                 "loss_logs": experiment.loss_logs,
                 "gradient_logs": experiment.gradient_logs,
-                "divergence_logs": experiment.divergence_logs,
+                "divergence_logs": experiment.avg_divergence_logs,
                 "prediction_logs": experiment.prediction_data
             },
             "figures": {
@@ -819,6 +900,7 @@ def setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3
     Output("run-button-minimise", "n_clicks"),
     Output("save-button-minimise", "disabled"), 
     Output("last-min-config", "data"),
+    Output("experiment-metrics", "children"),
     Input("run-button-minimise", "n_clicks"),
     State("function-mini-input", "value"),
     State({"type": "initial-value-input", "index": ALL}, "value"),
@@ -841,6 +923,8 @@ def setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3
     State("optim-y-input", "value"),
     State("noise-input", "value"),
     State("preset-function-input", "value"),
+    State("experiment-metrics", "children"),
+    State({"type": "Q-input", "index": ALL}, "value"),
     prevent_initial_call=True,
     allow_duplicate=True,
     suppress_callback_exceptions=True
@@ -848,7 +932,8 @@ def setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3
 )
 def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter,
                             lr, bregman, num_experiments, second_input_bool, q_store,
-                            p1s, p2s, p3s, q1, q2, q3, a, b, optx, opty, noise_std, preset_function):
+                            p1s, p2s, p3s, q1, q2, q3, a, b, optx, opty, noise_std,
+                            preset_function, current_metrics, q_strings):
     if n_clicks != 0:
         # parse objective function from string 
         print(second_input_bool)
@@ -862,13 +947,25 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter,
         objective = get_objective_function(preset_function, objective_string, a, b, q1, q2, q3, optx, opty, noise_std=noise_std)
     
         print(q_store)
-        # instantiate experiment object
-        experiment = ExperimentMD(objective, bregman=bregman[0], Q=torch.tensor(q_store[0][0], dtype=torch.float32), Q_inv=torch.tensor(q_store[0][1], dtype=torch.float32))
-        print("Experiment instantiated")
 
+        # minimum/optimum always known for preset functions, not for user input functions
+        if preset_function != "CUSTOM":
+            optimum = objective(objective.optimum)
+            optimum_coords = objective.optimum
+
+        else:
+            optimum, optimum_coords = None, None
+
+        # instantiate experiment object
+        experiment = ExperimentMD(objective, bregman=bregman[0], Q=torch.tensor(q_store[0][0], dtype=torch.float64),
+                                   Q_inv=torch.tensor(q_store[0][1], dtype=torch.float64), x_star=optimum_coords, f_star=optimum, dim=dim)
+        print("Experiment instantiated")
+        print(experiment.Q)
+        experiment_metrics = []
         # run experiment, generate and return figures
         print(experiment.objective)
         experiment.run_experiment_minimise(inits[0], iter[0], float(lr[0]))
+        experiment_metrics.append(experiment.gather_metrics())
         print("experiment complete")
 
         # instantiate the graph class
@@ -876,33 +973,46 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter,
 
         optimisation_path_fig = graph.create_optimisation_path_graph(experiment.minimisation_guesses, experiment.objective, dim)
         gradient_fig = graph.create_gradient_norm_graph(experiment.gradient_logs)
-        divergence_fig = graph.create_divergence_graph(experiment.divergence_logs)
+        divergence_fig = graph.create_divergence_graph(experiment.avg_divergence_logs)
         dual_fig = graph.create_dual_space_trajectory_graph(experiment.optimiser.logs["dual"],experiment.objective, dim)
 
         for i in range(1, num_experiments):
             experiment.clear()
-            experiment.bregman, experiment.Q, experiment.Q_inv = bregman[i],  torch.tensor(q_store[i][0], dtype=torch.float32), torch.tensor(q_store[i][1], dtype=torch.float32)
+            experiment.bregman, experiment.Q, experiment.Q_inv = bregman[i],  torch.tensor(q_store[i][0], dtype=torch.float64), torch.tensor(q_store[i][1], dtype=torch.float64)
             experiment.run_experiment_minimise(inits[i], iter[i], float(lr[i]))
+            experiment_metrics.append(experiment.gather_metrics())
             optimisation_path_fig, gradient_fig, divergence_fig, dual_fig = graph.update_all_graphs_min(experiment.minimisation_guesses, experiment.gradient_logs,
-                                                                                                        experiment.divergence_logs, experiment.optimiser.logs["dual"],
+                                                                                                        experiment.avg_divergence_logs, experiment.optimiser.logs["dual"],
                                                                                                         experiment.objective, i+1, dim)
 
-        # store the run configuration for saving 
-        experiments_dict = create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool)
+        
+        new_metrics = []
+        for i in range(num_experiments):
+            new_metrics.append(construct_experiment_results(i+1, experiment_metrics[i]))
 
+        metrics = [current_metrics[0]] + new_metrics
+        # store the run configuration for saving 
+        experiments_dict = create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool, q_strings, p1s, p2s, p3s)
+        metrics_dict = create_compiled_metrics_dicts(num_experiments, experiment_metrics)
         experiment_state = {
             "configuration": {
                 "experiment_type": "minimise",  
-                "function": objective_string,      
+                "function": objective_string, 
+                "function_preset": preset_function,
+                "var_a": a,
+                "var_b": b,
+                "opt_x": optx,
+                "opt_y": opty,
+                "noise": noise_std,
+                "q1": q1,
+                "q2": q2,
+                "q3": q3     
             },
             "experiments": experiments_dict,
-            "results": {
-                "mini_guess_logs": experiment.minimisation_guesses,
-                "gradient_logs": experiment.gradient_logs,
-                "divergence_logs": experiment.divergence_logs,
-            },
+            "metrics": metrics_dict,
             "figures": {
                 "optim_fig": optimisation_path_fig.to_plotly_json(),
+                "dual_optim_fig": dual_fig.to_plotly_json(),
                 "gradient_fig": gradient_fig.to_plotly_json(),
                 "divergence_fig": divergence_fig.to_plotly_json(),
             }
@@ -911,26 +1021,35 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter,
         return [dcc.Graph(figure=optimisation_path_fig, id="optimisation-path-fig", config={'responsive': True},className="graph"),
                 dcc.Graph(figure=dual_fig, id="dual-fig",config={'responsive': True}, className="graph"),
                 dcc.Graph(figure=gradient_fig, id="gradient-fig",config={'responsive': True}, className="graph"),
-                dcc.Graph(figure=divergence_fig, id="divergence-fig",config={'responsive': True}, className="graph")], 0, False, experiment_state
+                dcc.Graph(figure=divergence_fig, id="divergence-fig",config={'responsive': True}, className="graph")], 0, False, experiment_state, metrics
     
     else:
         return no_update
-    
 
 
 # function that creates a dictionary of the different experiment configurations used for a minimisation run 
-def create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool):
+def create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool, qs, p1s, p2s, p3s):
     experiments_dict = {}
     for i in range(num_experiments):
         experiments_dict[f"experiment-{i+1}"] = {
             "initial_value_x": init_x[i],
-            "initial_value_y": init_y[i] if not second_input_bool[0] else None,
+            "initial_value_y": init_y[i],
             "iterations": iter[i],
             "learning_rate": lr[i],
-            "bregman": bregman[i]
+            "bregman": bregman[i],
+            "p1": p1s[i],
+            "p2": p2s[i],
+            "p3": p3s[i],
+            "Q": qs[i] 
     }
     return experiments_dict
 
+def create_compiled_metrics_dicts(num_experiments, metric_dicts):
+    metric_dict_compiled = {}
+    for i in range(num_experiments):
+        metric_dict_compiled[f"experiment-{i+1}-metrics"] = metric_dicts[i]
+    return metric_dict_compiled
+            
 def create_experiment_dict_approx(num_experiments, layers, neurons, epochs, batch_size, lr, bregman, loss):
     experiments_dict = {}
     for i in range(num_experiments):
@@ -953,20 +1072,27 @@ def create_experiment_dict_approx(num_experiments, layers, neurons, epochs, batc
     Input({"type": "number-iterations-input", "index": ALL}, "value"),
     Input({"type": "lr-mini-input", "index": ALL}, "value"),
     Input({"type": "bregman-mini-input", "index": ALL}, "value"),
+    Input({"type": "Q-input", "index": ALL}, "value"),
     Input("num-experiments-min", "data"),
     Input({"type": "initial-value-input-2", "index": ALL}, "disabled"),
+    State("preset-function-input", "value"),
+    State({"type": "simplex-initial-value-input", "index": ALL}, "value"),
+    State({"type": "simplex-initial-value-input-2", "index": ALL}, "value"),
+    State({"type": "simplex-initial-value-input-3", "index": ALL}, "value"),
     State("last-min-config", "data"),
     prevent_initial_call=True
 )
-def listen_then_disable_save_min(objective_string, init_x, init_y, iter, lr, bregman, num_experiments, second_input_bool, last_config):
+def listen_then_disable_save_min(objective_string, init_x, init_y, iter, lr, bregman, q_strings,
+                                  num_experiments, second_input_bool, preset_function, p1s, p2s, p3s, last_config):
     # this callback listens for changes in any input paramaters for the minimisation variant.
     # if configuration has changed since the last run, then disable the save button to prevent users saving a run that has results for a different configuration
 
-    experiments_dict = create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool)
+    experiments_dict = create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool, q_strings, p1s, p2s, p3s)
     current_config = {
             "configuration": {
                 "experiment_type": "minimise",  
-                "function": objective_string,      
+                "function": objective_string, 
+                "function_preset": preset_function     
             }}
     current_config["experiments"] = experiments_dict
 
@@ -1079,7 +1205,8 @@ def download_minimise_experiment(n_clicks_min, n_clicks_approx, experiment_data_
 # builds a matching minimise-configuration from the saved json
 def build_minimise_config_from_saved(saved_state):
     experiments = saved_state.get("experiments", {})
-
+    metrics = saved_state.get("metrics", {})
+    metric_configs = []
     experiment_configs = []
     for i in range(len(experiments)):
         exp = experiments.get(f"experiment-{i+1}")
@@ -1087,7 +1214,15 @@ def build_minimise_config_from_saved(saved_state):
                                                         exp.get("initial_value_y"),
                                                         exp.get("iterations"),
                                                         exp.get("learning_rate"),
-                                                        exp.get("bregman")))
+                                                        exp.get("p1"),
+                                                        exp.get("p2"),
+                                                        exp.get("p3"),
+                                                        exp.get("Q"),
+                                                        exp.get("bregman"),))
+        
+    for i in range(len(experiments)):
+        metric = metrics.get(f"experiment-{i+1}-metrics", {})
+        metric_configs.append(construct_experiment_results(i+1, metric))
     print("length of experiment configs ", len(experiment_configs))
     minimise_config = html.Div([html.Div([
     dcc.Markdown("**Objective function and algorithm parameters**"),
@@ -1096,12 +1231,55 @@ def build_minimise_config_from_saved(saved_state):
         dcc.Input(type="text", value=saved_state["configuration"].get("function", ""), style={"marginBottom": "5px"}, className="input-function", id="function-mini-input"),
     ], className="input-row"),
     html.Div([
-        html.Label("Variables"),
-        dcc.Input(type="number", value=1, step=1, min=1, max=2, style={"marginBottom": "5px"}, className="input-values", id="num-variables-input"),
-    ], className="input-row")] + experiment_configs
+        html.Label("Function Presets"),
+        dcc.Dropdown(
+            options=[
+                {"label": "Custom", "value": "CUSTOM"},
+                {"label": "Anisotropic", "value": "ANISO"},
+                {"label": "3D Simplex", "value": "SIMPLEX"},
+                {"label": "Rosenbrock", "value": "ROSENBROCK"},
+                {"label": "Rastrigin", "value": "RASTRIGIN"},
+                {"label": "Booth", "value": "BOOTH"},
+                {"label": "Ackley", "value": "ACKLEY"},
+                
+            ]    
+        , id="preset-function-input",className="dropdown", value=saved_state["configuration"].get("function_preset", ""))
+    ], className = "input-row"),
+    html.Div([
+        html.Label("Variable (a)"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("var_a"), style={"marginBottom": "5px"}, className="input-values", id="a-input")
+    ], className="input-row hidden", id="a-input-row"),
+    html.Div([
+        html.Label("Variable (B)"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("var_b"), style={"marginBottom": "5px"}, className="input-values", id="b-input")
+    ], className="input-row hidden", id="b-input-row"),
+    html.Div([
+        html.Label("Optimum (x)"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("opt_x"), style={"marginBottom": "5px"}, className="input-values", id="optim-x-input")
+    ], className="input-row hidden", id="optim-x-input-row"),
+    html.Div([
+        html.Label("Optimum (y)"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("opt_y"), style={"marginBottom": "5px"}, className="input-values", id="optim-y-input")
+    ], className="input-row hidden", id="optim-y-input-row"),
+    html.Div([
+        html.Label("Noise"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("noise"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="noise-input")
+    ], className="input-row hidden", id="noise-input-row"),
+    html.Div([
+        html.Label("Target q1"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("q1"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q1-input")
+    ], className="input-row hidden", id="q1-input-row"),
+    html.Div([
+        html.Label("Target q2"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("q2"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q2-input")
+    ], className="input-row hidden", id="q2-input-row"),
+    html.Div([
+        html.Label("Target q3"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("q3"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q3-input")
+    ], className="input-row hidden", id="q3-input-row")] + experiment_configs
     , className= "settings", id="inner-div")], id="minimise-config", className="option-columns-mlp")
 
-    return minimise_config
+    return minimise_config, metric_configs
 
 def build_approximate_config_from_saved(saved_state):
     experiments = saved_state.get("experiments", {})
@@ -1164,13 +1342,16 @@ def build_experiment_results_from_saved(saved_state, type):
         if "optim_fig" in figs:
             optim_fig = plotly.Figure(figs["optim_fig"])
             graphs.append(dcc.Graph(figure=optim_fig, id="optimisation-path-fig", config={'responsive': True}, className="graph"))
+        if "dual_optim_fig" in figs:
+            dual_fig = plotly.Figure(figs["dual_optim_fig"])
+            graphs.append(dcc.Graph(figure=dual_fig, id="divergence-fig", config={'responsive': True}, className="graph"))
+    
         if "gradient_fig" in figs:
             gradient_fig = plotly.Figure(figs["gradient_fig"])
             graphs.append(dcc.Graph(figure=gradient_fig, id="gradient-fig", config={'responsive': True}, className="graph"))
         if "divergence_fig" in figs:
             divergence_fig = plotly.Figure(figs["divergence_fig"])
             graphs.append(dcc.Graph(figure=divergence_fig, id="divergence-fig", config={'responsive': True}, className="graph"))
-    
     elif type=="approximate":
         if "loss_fig" in figs:
             loss_fig = plotly.Figure(figs["loss_fig"])
@@ -1190,6 +1371,7 @@ def build_experiment_results_from_saved(saved_state, type):
 @callback(
     Output("config-options", "children", allow_duplicate=True),
     Output("experiment-output", "children", allow_duplicate=True),
+    Output("experiment-metrics", "children", allow_duplicate=True),
     Output("num-experiments-min", "data", allow_duplicate=True),
     Output("num-experiments-approx", "data", allow_duplicate=True),
     Output("add-button-minimise", "n_clicks", allow_duplicate=True),
@@ -1202,9 +1384,10 @@ def build_experiment_results_from_saved(saved_state, type):
     State("upload-config", "contents"),
     State("upload-config", "filename"),
     State("config-options", "children"),
+    State("experiment-metrics", "children"),
     prevent_initial_call=True
 )
-def load_experiment(load_clicks, contents, filename, current_children):
+def load_experiment(load_clicks, contents, filename, current_children, current_children_metrics):
     
     triggered = callback_context.triggered
     if not triggered:
@@ -1222,13 +1405,14 @@ def load_experiment(load_clicks, contents, filename, current_children):
     num_experiments = len(saved_experiment.get("experiments", {}))
     if saved_experiment["configuration"].get("experiment_type") == "minimise":
 
-        minimise_config_new = build_minimise_config_from_saved(saved_experiment)
+        minimise_config_new, metrics = build_minimise_config_from_saved(saved_experiment)
         print("minimise config len ", len(minimise_config_new))
         new_children = current_children[:2] + [minimise_config_new, approx_config] + [current_children[-1]]
 
         new_experiment_results = build_experiment_results_from_saved(saved_experiment, "minimise")
-    
-        return new_children, new_experiment_results, num_experiments, no_update, num_experiments, "config-button", "config-button-clicked", "minimise", "option-columns-mlp", "option-columns-mlp hidden"
+        new_metrics = [current_children_metrics[0]] + metrics
+
+        return new_children, new_experiment_results, new_metrics, num_experiments, no_update, num_experiments, "config-button", "config-button-clicked", "minimise", "option-columns-mlp", "option-columns-mlp hidden"
     
     elif saved_experiment["configuration"].get("experiment_type") == "approximate":
         approx_config_new = build_approximate_config_from_saved(saved_experiment)

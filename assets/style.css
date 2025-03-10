@@ -1,11 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&family=Slabo+27px&display=swap');
 :root{
     --bg: #e8dac5;
     --la: #a2bab2;
     --mc: #6c6a72;
     --da: #f2e9dd;
     --ds: #322634;
+    --hb: #cbc0ad;
 }
 
 body{
@@ -64,7 +65,7 @@ p {
 }
 
 .padding-markdown {
-    padding: 0 0 1vw 1vw;
+    padding: 0 0 0.3vh 1vw;
 }
 
 .bregman-visual {
@@ -103,7 +104,7 @@ p {
     color: var(--ds);
     background-color: var(--da);
     border-radius: 5px;
-    padding-top: 1vh;
+    padding-top: 0.2vh;
     margin-right: 1vw;
     margin-bottom: 0.5vh;
 }
@@ -120,7 +121,7 @@ p {
     color: var(--ds);
     background-color: var(--da);
     border-radius: 5px;
-    padding-top: 1vh;
+    padding-top: 0.2vh;
     margin-bottom: 0.5vh;
 }
 
@@ -299,7 +300,14 @@ h4 {
     padding: 1px 2px 0 2px;
 }
 
-
+h3 { 
+    background-color: var(--hb);
+    padding-left: 0.2vw; 
+    border-radius: 2px;
+    margin: 0.4vh 0.26vw 0.4vh 0.26vw;
+    height: 25px;
+    text-decoration: underline;
+}
 
 .invalid {
     border: 2px solid red;
@@ -314,8 +322,12 @@ h4 {
     text-align: center;
     font-size: large;
     color: var(--ds);
-    height: 30px;
+    height: 25px;
     margin-bottom: 0px;
+    width:100%;
+    border-radius: 2px;
+    margin-bottom: 0.2vh;
+    background-color: var(--hb);
 }
 
 .config-button { 
@@ -533,7 +545,7 @@ div[id*='"type":"bregman-mini-input"'], #preset-function-input{
 
 .configuration-options {
     width: 25%;
-    padding: 5px;
+    padding: 0.26vw;
     background: var(--da);
     border-radius: 5px;
     display: flex;
@@ -546,15 +558,69 @@ div[id*='"type":"bregman-mini-input"'], #preset-function-input{
 }
 
 .experiment-graphs {
-    width: 70%;
+    width: 60%;
     height: 100%;
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
     gap: 10px;
     margin-top: 0.5vh;
+    margin-right: 0.5vw;
 }
 
+.experiment-metrics {
+    height: 100%;
+    width: 15%;
+    font-family: "Roboto", serif;
+    color: var(--ds);
+    font-weight: 400;
+    font-style: normal;
+    background: var(--da);
+    display: flex;
+    border-radius: 5px;
+    flex-direction: column;
+    align-self: flex-start;
+    flex-shrink: 0;
+    padding: 0.3vh 0.2vw;
+}
+
+.experiment-result { 
+    display: block;
+
+}
+
+#metrics-header {
+    text-align: center;
+    text-decoration: underline;
+    margin: 0.5vh 0 0.5vh 0;
+}
+
+.experiment-header {
+    text-align: center;
+    font-size: 0.9em;
+
+}
+
+.metrics-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8em;
+}
+
+.metrics-table td {
+    border: 1px solid #ccc;
+    padding: 0.2vh 12px;
+}
+
+.metric-name {
+    font-weight: 400;
+    width: 65%;
+}
+
+.metric-value {
+    text-align: right;
+    width: 35%;
+}
 /* .experiment-graphs .dash-graph {
     
 } */

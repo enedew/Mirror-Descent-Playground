@@ -317,7 +317,7 @@ class Graphs():
                 name="(1)"
             ))
             self.optimisation_path_graph.update_layout(
-                title='optimisation path',
+                title='Primal Space Optimisation Trajectory',
                 xaxis_title='x',
                 yaxis_title='y',
                 template="plotly_white",
@@ -419,7 +419,7 @@ class Graphs():
             ))
             
             self.optimisation_path_graph.update_layout(
-                title='optimisation path',
+                title='Primal Space Optimisation Trajectory',
                 xaxis_title='',
                 yaxis_title='',
                 template="plotly_white",
