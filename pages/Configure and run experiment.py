@@ -1,4 +1,4 @@
-from dash import html, dcc, callback, Input, Output, State, callback_context, no_update, Patch, ALL
+from dash import html, dcc, callback, Input, Output, State, callback_context, no_update, Patch, ALL, MATCH, clientside_callback
 import dash
 from dash.exceptions import PreventUpdate
 from Graphs import Graphs
@@ -10,7 +10,7 @@ import json
 import base64
 import numpy as np
 from PresetFuncs import AnisotropicQuadratic, Rastrigin, Rosenbrock, SimplexObjective, Booth, Ackley
-
+import os
 dash.register_page(__name__, path="/run-experiment")
 
 explanation_md = r"""
@@ -25,59 +25,12 @@ There are several pre-configured experiments which you can load. Alternatively y
 and upload the configuration to run again.
 """
 
+default_config_path = os.path.join(os.path.dirname(__file__), '../base_experiment.json')
+with open(default_config_path, 'r') as f:
+    default_config = json.load(f)
+
 # constructor functions 
-def construct_md_settings(idx, batch_size=500, bregman="EUCLID", loss="MSE", lr=0.01):
-    return html.Div([
-    dcc.Markdown(f"**Mirror Descent Options ({idx})**"),
-    html.Div([
-        html.Label("Batch Size"),
-        dcc.Input(type="number", value=batch_size, style={"marginBottom": "5px"}, className="input-values", id={"type": "batch-size-input", "index": idx}),
-    ], className="input-row"),
-    html.Div([
-        html.Label("Bregman"),
-        dcc.Dropdown(
-            options=[
-                {"label": "Euclidean", "value": "EUCLID"},
-                {"label": "KL", "value": "KL"},
-                {"label": "Mahalanobis", "value": "MAHALANOBIS"},
-                {"label": "Itakura-Saito", "value": "ITAKURA-SAITO"}
-            ]    
-        , id={"type": "bregman-input", "index": idx},className="bregman-loss-input", value=bregman)
-    ], className = "input-row"),
-    html.Div([
-        html.Label("Loss"),
-        dcc.Dropdown(
-            options = [
-                {"label": "MSE", "value": "MSE"},
-                {"label": "MAE", "value": "MAE"},
-                {"label": "Huber", "value": "Huber"}
-            ]
-        , id={"type": "loss-input", "index": idx}, className="bregman-loss-input", value=loss)
-    ], className = "input-row"),
-    html.Div([
-        html.Label("Learning Rate"),
-        dcc.Input(type="number", value=lr, step=0.001, min=0, style={"marginBottom": "5px"}, className="input-values", id={"type": "lr-input", "index": idx}),
-    ], className="input-row")
-    ], className="model-settings")
 
-
-def construct_model_settings(idx, layers=2, neurons=10, epochs=2000):
-    
-    return html.Div([
-    dcc.Markdown(f"**Model options ({idx})**"),
-    html.Div([
-        html.Label("Layers"),
-        dcc.Input(type="number", value=layers, style={"marginBottom": "5px"}, className="input-values", id={"type": "layers-input", "index": idx})
-    ], className="input-row"),
-    html.Div([
-        html.Label("Neurons"),
-        dcc.Input(type="number", value=neurons, style={"marginBottom": "5px"}, className="input-values", id={"type": "neuron-input", "index": idx})
-    ], className="input-row"),
-    html.Div([
-        html.Label("Epochs"),
-        dcc.Input(type="number", value=epochs, style={"marginBottom": "5px"}, className="input-values", id={"type": "epoch-input", "index": idx})
-    ], className="input-row"),
-], className="model-settings-left", id=f"model-settings-{idx}")
 
 def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01, p1=0.2, p2=0.3, p3=0.5, Q="2, 0, 0, 1", bregman="EUCLID"):
     return html.Div([
@@ -139,26 +92,6 @@ def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01
     ], className="settings", id={"type": "minimise-settings", "index": idx})
 
 
-function_md_settings = html.Div([
-    dcc.Markdown("**Function / Data values**"),
-    html.Div([
-        html.Label("Function"),
-        dcc.Input(type="text", value="X**2 + 3*X", style={"marginBottom": "5px"}, className="input-function", id="function-input")
-    ], className="input-row"),
-    html.Div([
-        html.Label("Input range"),
-        dcc.Input(type="number", value=-5, style={"marginBottom": "5px"}, className="input-values", id="data-lbound-input"),
-        dcc.Input(type="number", value=5, style={"marginBottom": "5px"}, className="input-values", id="data-ubound-input"),
-    ], className="input-row"),
-    html.Div([
-        html.Label("Samples"),
-        dcc.Input(type="number", value=500, style={"marginBottom": "5px"}, className="input-values", id="num-samples-input"),
-    ], className="input-row"),
-    construct_md_settings(1)
-    
-], className="model-settings", id="function-md-settings")
-
-
 
 minimise_config = html.Div([html.Div([
     dcc.Markdown("**Objective function and algorithm parameters**"),
@@ -216,16 +149,7 @@ minimise_config = html.Div([html.Div([
     construct_mini_settings(1)
 ], className= "settings", id="inner-div")], id="minimise-config", className="option-columns-mlp")
 
-approx_config = html.Div([
-                    construct_model_settings(1), function_md_settings],
-                id="approx-config", className="option-columns-mlp hidden")
 
-
-metrics_data = [
-    {"name": "Objective Value", "value": 0.2345},
-    {"name": "Gradient Norm", "value": 0.000123},
-    {"name": "Bregman Divergence", "value": 1.234e-5},
-]
 
 def construct_experiment_results(idx, metrics_dict):
        # function converts the metrics_dict into a table
@@ -292,22 +216,30 @@ def update_selected_metrics(n_clicks_list, selected_metrics):
     return selected_metrics
 
 
-# callback highlights any selected metrics for comparison
-@callback(
+clientside_callback(
+    """
+    function(selectedMetrics, ids) {
+        // Ensure selectedMetrics is an array.
+        if (!selectedMetrics) { selectedMetrics = []; }
+        let styles = [];
+        // Iterate over all metric row ids (each is an object with keys like "metric" and "table")
+        for (let i = 0; i < ids.length; i++) {
+            const idObj = ids[i];
+            // Define the base style.
+            let baseStyle = {cursor: "pointer"};
+            // If this row's metric is in the selectedMetrics list, apply the highlight.
+            if (selectedMetrics.indexOf(idObj.metric) !== -1) {
+                baseStyle.backgroundColor = "#a2bab2";
+            }
+            styles.push(baseStyle);
+        }
+        return styles;
+    }
+    """,
     Output({'type': 'metric-row', 'metric': ALL, 'table': ALL}, 'style'),
     Input("selected-metrics", "data"),
     State({'type': 'metric-row', 'metric': ALL, 'table': ALL}, 'id')
 )
-def update_row_styles(selected_metrics, ids):
-    new_styles = []
-    
-    for component_id in ids:
-        base_style = {'cursor': 'pointer'}  
-        if component_id['metric'] in selected_metrics:
-            new_styles.append({**base_style, 'backgroundColor': '#a2bab2'})
-        else:
-            new_styles.append(base_style)
-    return new_styles
 
 # placeholder variables to be updated via callback
 minimise_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-minimise")
@@ -315,52 +247,45 @@ minimise_add_button = html.Button("+", className="add-button", n_clicks=1, id="a
 minimise_save_button = html.Button("Save", className="save-button", id="save-button-minimise", disabled=True, title="Cannot save until experiment has ran", n_clicks=0)
 minimise_remove_button = html.Button("-", className="add-button", id="remove-button-minimise", disabled=True, title="Must be at least one configuration", n_clicks=0)
 
-approximate_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-approximate")
-approximate_add_button = html.Button("+", className="add-button", n_clicks=1, id="add-button-approximate", title="add a configuration")
-approximate_save_button = html.Button("Save", className="save-button", id="save-button-approximate", disabled=True,  title="Cannot save until experiment has ran", n_clicks=0)
-approximate_remove_button = html.Button("-", className="add-button", id="remove-button-approximate", disabled=True, title="Must be at least one configuration", n_clicks=0)
 
 
-run_button_container = html.Div([minimise_run_button, minimise_add_button, minimise_remove_button, approximate_run_button , minimise_save_button, approximate_add_button, approximate_remove_button, approximate_save_button], id="run-button-container")
+run_button_container = html.Div([minimise_run_button, minimise_add_button, minimise_remove_button, minimise_save_button], id="run-button-container")
 experiment_figs = html.Div([], id="experiment-output", className="experiment-graphs")
+
 experiment_results = html.Div([
-    html.H3("Metrics", id="metrics-header"),
-], id="experiment-metrics", className="experiment-metrics")
+        html.H3("Metrics", id="metrics-header"),
+        dcc.Loading(
+            id="loading-metrics",
+            type="default",
+            color="#e8dac5",
+            children=None),
+    ], id="experiment-metrics", className="experiment-metrics hidden")
+
 experiment_settings_type_store = dcc.Store(id="experiment-settings-type", data="minimise")
 
 config_options = html.Div([
     dcc.Markdown("#### Configuration", className="markdown-config", id="config-title"),
-    html.Div([
-        html.Button("Approximate", className="config-button", id="approx-button", n_clicks=0),
-        html.Button("Minimise",   className="config-button-clicked", id="min-button",   n_clicks=0)
-    ], id="top-div-config"),
     minimise_config,
-    approx_config,
     run_button_container
 ], className="configuration-options", id="config-options")
 
 # dcc.store components to act as global variables for callback logic 
 # stores for the current number of experiment configurations 
 num_experiments_min_store = dcc.Store(id="num-experiments-min", data=1)
-num_experiments_approx_store = dcc.Store(id="num-experiments-approx", data=1)
 
 # stores for the last run configuration 
 last_run_config_min_store = dcc.Store(id="last-min-config", data=None)
-last_run_config_approx_store = dcc.Store(id="last-approx-config", data=None)
 
 # boolean flags which are used to initiate the loading of a minimisation/approximation experiment from json
 load_min_bool = dcc.Store(id="load-min", data=False)
-load_approx_bool = dcc.Store(id="load-approx", data=False)
 
 # download component that gets triggered when a save button is clicked 
 run_config_download = dcc.Download(id="save-config")
 
 # stores the current number save button clicks 
 mini_save_clicks_store = dcc.Store(id="mini-save-clicks", data=0)
-approx_save_clicks_store = dcc.Store(id="approx-save-clicks", data=0)
 
 # stores the current number of approx/mini button clicks 
-global_approx_clicks_store = dcc.Store(id="approx-clicks", data=0)
 global_min_clicks_store = dcc.Store(id="min-clicks", data=0)
 selected_metrics_store = dcc.Store(id="selected-metrics", data=[])
 # stores the currently inputted Q matrices as tensors for use in experiment callbacks
@@ -368,7 +293,7 @@ Q_store = dcc.Store(id="Q-store", data=None)
 
 # dim store 
 dim_store = dcc.Store(id="dim-store", data=1)
-
+default_config_store = dcc.Store(id="default-experiment-config", data=default_config)
 layout = html.Div([
     html.Div([
         html.Div([
@@ -410,21 +335,18 @@ layout = html.Div([
     ], className= "experiment-div"),
     experiment_settings_type_store,
     num_experiments_min_store,
-    num_experiments_approx_store,
-    global_approx_clicks_store,
     global_min_clicks_store,
-    last_run_config_approx_store,
     last_run_config_min_store,
     run_config_download,
     mini_save_clicks_store,
-    approx_save_clicks_store,
     load_min_bool,
-    load_approx_bool,
     Q_store,
     dim_store,
-    selected_metrics_store
+    selected_metrics_store,
+    default_config_store
     
 ], style={"padding": "5px 20px 20px 20px"})
+
 
 
 
@@ -493,53 +415,6 @@ def update_initial_value_input(func, num_experiments):
         return [True]*num_experiments
 
 
-# callback to add/remove configurations for approximation experiment
-@callback(
-    Output("config-options", "children", allow_duplicate=True),
-    Output("num-experiments-approx", "data", allow_duplicate=True),
-    Input("add-button-approximate", "n_clicks"),
-    Input("remove-button-approximate", "n_clicks"),
-    State("config-options", "children"),
-    State("num-experiments-approx", "data"),
-    State("experiment-settings-type", "data"),
-    prevent_initial_call=True
-)
-def update_configuration_approx(n_clicks_add, n_clicks_remove, current_children, num_experiments, experiment_type):
-    ctx = callback_context
-    if not ctx.triggered:
-        return no_update
-
-    triggered_prop = ctx.triggered[0]["prop_id"]
-
-    # adding a configuration
-    if "add-button-approximate" in triggered_prop:
-        if (not n_clicks_add) or (n_clicks_add <= num_experiments) or (experiment_type != "approximate"):
-            return no_update
-        num_experiments += 1
-        print(f"add approx ran - {num_experiments}")
-        
-        new_settings = html.Div(
-            [construct_model_settings(num_experiments), construct_md_settings(num_experiments)],
-            id=f"new-settings-{num_experiments}", className="option-columns-mlp"
-        )
-        updated_children = Patch()
-        updated_children.insert(-1, new_settings)
-        return updated_children, num_experiments
-
-    # removing a configuration
-    elif "remove-button-approximate" in triggered_prop:
-        if (not n_clicks_remove) or (n_clicks_remove == num_experiments) or (experiment_type != "approximate"):
-            return no_update
-        num_experiments -= 1
-        print(f"remove approx ran - {num_experiments}")
-        
-        updated_children = Patch()
-    
-        del updated_children[-2]
-        return updated_children, num_experiments
-
-    return no_update
-
 # callback to add/remove configurations for a minimisation experiment
 @callback(
     Output("config-options", "children", allow_duplicate=True),
@@ -597,15 +472,6 @@ def disable_enable_remove_button_minimise(num_experiments):
     else: 
         return True
     
-@callback(
-    Output("remove-button-approximate", "disabled"),
-    Input("num-experiments-approx", "data")
-) 
-def disable_enable_remove_button_approximate(num_experiments):
-    if num_experiments > 1:
-        return False
-    else: 
-        return True
 
 @callback(
     Output("dim-store", "data"),
@@ -653,14 +519,6 @@ def manage_bregman_options(current_dim, num_experiments):
     return [base_options]*num_experiments
 
 
-# assumes batch mirror descent, and automatically sets the batch size to be equal to the number of samples
-# if user changes the batch size for mirror descent it shouldn't change back unless the sample number is changed
-@callback(
-    Output("batch-size-input", "value"),
-    Input("num-samples-input", "value")
-)
-def update_batch_size(num_samples):
-    return num_samples
 
 # callback to add input field for positive definite matrix Q when mahalanobis distance is selected
 # also sets default value of Q to correct dims depending on the problem selected - 3x3 for simplex or 2x2 for 2D functions
@@ -729,185 +587,6 @@ def check_positive_definite(input_values, total_input_components, preset_functio
     return classnames, qs
 
 
-    
-         
-    
-
-# callback triggers when either the minimise or approximate button is clicked and updates experiment_type store
-# also makes sure to remove any extra configurations that have been added for the previous type of experiment
-@callback(
-    Output("config-options", "children", allow_duplicate=True),
-    Output("approx-button", "className"),
-    Output("min-button", "className"),
-    Output("experiment-settings-type", "data"),
-    Output("approx-clicks", "data"),
-    Output("min-clicks", "data"),
-    Output("num-experiments-min", "data", allow_duplicate=True),
-    Output("num-experiments-approx", "data", allow_duplicate=True),
-    Output("minimise-config", "className"),
-    Output("approx-config", "className"),
-    Input("approx-button", "n_clicks"),
-    Input("min-button", "n_clicks"),
-    State("config-options", "children"),
-    State("approx-clicks", "data"),
-    State("min-clicks", "data"),
-    prevent_initial_call=True
-   
-)
-def update_experiment_settings(approx_clicks, min_clicks, current_children, g_approx_clicks, g_min_clicks):
-    # this callback sometimes gets triggered when adding an experiment, as the min or approx buttons are reloaded and 
-    # this counts as a condition for the callback
-    # to combat this, im keeping track of the actual clicks with a dcc.Store element so I can check if the button has actually been clicked
-    print("update_experiment_settings ran")
-    context = callback_context
-    
-    new_children_mini = current_children[:2] + [minimise_config, approx_config] + [current_children[-1]]
-    new_children_approx = current_children[:2] + [minimise_config, approx_config] + [current_children[-1]]
-    if not context.triggered:
-    
-        return new_children_mini, "config-button", "config-button-clicked", "minimise", g_approx_clicks, g_min_clicks, 1, 1, "option-columns-mlp", "option-columns-mlp hidden"
-    else:
-        # find which button was clicked then update accordingly
-        button_triggered = context.triggered[0]["prop_id"].split(".")[0]
-        if button_triggered == "min-button":
-            if min_clicks == g_min_clicks:
-                return no_update
-            g_min_clicks = min_clicks
-            return new_children_mini, "config-button", "config-button-clicked", "minimise",g_approx_clicks, g_min_clicks, 1, 1, "option-columns-mlp", "option-columns-mlp hidden"
-        elif button_triggered == "approx-button": 
-            if approx_clicks == g_approx_clicks:
-                return no_update
-            
-            g_approx_clicks = approx_clicks
-        
-            return new_children_approx, "config-button-clicked", "config-button", "approximate", g_approx_clicks, g_min_clicks, 1, 1, "option-columns-mlp hidden", "option-columns-mlp"
-        else:
-            if approx_clicks == g_approx_clicks:
-               
-                return no_update
-       
-            g_min_clicks = min_clicks
-            return new_children_mini, "config-button", "config-button-clicked", "minimise", g_approx_clicks, g_min_clicks, 1, 1, "option-columns-mlp", "option-columns-mlp hidden"
-
-
-# updates which run button (approx or minimise) to display based on the experiment type store
-@callback(
-    Output("run-button-minimise", "className"),
-    Output("add-button-minimise", "className"),
-    Output("save-button-minimise", "className"),
-    Output("remove-button-minimise", "className"),
-    Output("run-button-approximate", "className"),
-    Output("add-button-approximate", "className"),
-    Output("save-button-approximate", "className"),
-    Output("remove-button-approximate", "className"),
-    Input("experiment-settings-type", "data"),
-)
-def update_run_button(experiment_type):
-    if experiment_type == "minimise":
-        return "run-button", "add-button", "save-button", "add-button", "run-button hidden", "add-button hidden", "save-button hidden", "add-button hidden"
-    elif experiment_type == "approximate":
-        return "run-button hidden", "add-button hidden", "save-button hidden", "add-button hidden", "run-button", "add-button", "save-button", "add-button"
-    else: 
-        return ValueError("Unrecognised experiment type")
-
-# run an approximation experiment, taking in single or multiple experiment configurations
-# overlays the graphs to directly compare results immediately
-@callback(
-    Output("experiment-output", "children", allow_duplicate=True),
-    Output("run-button-approximate", "n_clicks"),
-    Output("save-button-approximate", "disabled"),
-    Output("last-approx-config", "data"),
-    Input("run-button-approximate", "n_clicks"),
-    State({"type": "layers-input", "index": ALL}, "value"),
-    State({"type": "neuron-input", "index": ALL}, "value"),
-    State({"type": "epoch-input", "index": ALL}, "value"),
-    State("function-input", "value"),
-    State("data-lbound-input", "value"),
-    State("data-ubound-input", "value"),
-    State("num-samples-input", "value"),
-    State({"type": "batch-size-input", "index": ALL}, "value"),
-    State({"type": "bregman-input", "index": ALL}, "value"),
-    State({"type": "loss-input", "index": ALL}, "value"),
-    State({"type": "lr-input", "index": ALL}, "value"),
-    State("num-experiments-approx", "data"),
-    State("Q-store", "data"),
-    prevent_initial_call=True,
-    allow_duplicate=True,
-    suppress_callback_exceptions=True,
-    debug=False
-)
-def run_experiment_mlp(n_clicks, layers, neurons, epochs, objective_string, range_min, range_max,
-                        n_samples, batch_size, bregman, loss, lr, num_experiments, q_store):
-    if n_clicks != 0:       
-        # parse from string the function to approximate
-        parser = FunctionParser(objective_string)
-        parser.test_function()
-        fta = parser.string_to_lambda()
-        # test the function on a value of 1
-        print(fta(torch.tensor(1)))
-
-        # instantiate the experiment object
-        experiment = ExperimentMD(fta, bregman=bregman[0], Q=q_store[0][0], Q_inv=q_store[0][1])
-        print("Experiment instantiated")
-        experiment.criterion = experiment.losses[loss[0]]
-
-        # insantiate the graph object
-        graph = Graphs()
-
-        
-        # run the first experiment, generate and return figures
-        experiment.run_experiment_mlp(range_min, range_max, n_samples, batch_size[0], layers[0],
-                                       neurons[0], epochs[0], float(lr[0]))
-
-        loss_fig = graph.create_loss_curve(experiment.loss_logs)
-        gradient_fig = graph.create_gradient_norm_graph(experiment.gradient_logs)
-        divergence_fig = graph.create_divergence_graph(experiment.avg_divergence_logs)
-        results_fig = graph.create_function_approximation_plot(experiment.prediction_data)
-
-        for i in range(1, num_experiments):
-            # clear the experiment logs for the next experiment
-            experiment.clear() 
-            # update bregman and loss
-            experiment.bregman, experiment.criterion, experiment.Q, experiment.Q_inv = bregman[i], experiment.losses[loss[i]], q_store[i][0], q_store[i][1]
-            # run the new experiment
-            experiment.run_experiment_mlp(range_min, range_max, n_samples, batch_size[i], layers[i],
-                                       neurons[i], epochs[i], float(lr[i]))
-            # update graphs
-            loss_fig, gradient_fig, divergence_fig, results_fig = graph.update_all_graphs_approx(experiment.loss_logs, experiment.gradient_logs,
-                                                                                                 experiment.avg_divergence_logs, experiment.prediction_data, i+1)
-        
-        experiments_dict = create_experiment_dict_approx(num_experiments, layers, neurons, epochs, batch_size, lr, bregman, loss)
-        experiment_state = {
-            "configuration": {
-                "experiment_type": "approximate",  
-                "function": objective_string,
-                "range_min": range_min,
-                "range_max": range_max,
-                "num_samples": n_samples  
-            },
-            "experiments": experiments_dict,
-            "results": {
-                "loss_logs": experiment.loss_logs,
-                "gradient_logs": experiment.gradient_logs,
-                "divergence_logs": experiment.avg_divergence_logs,
-                "prediction_logs": experiment.prediction_data
-            },
-            "figures": {
-                "loss_fig": loss_fig.to_plotly_json(),
-                "gradient_fig": gradient_fig.to_plotly_json(),
-                "divergence_fig": divergence_fig.to_plotly_json(),
-                "results_fig": results_fig.to_plotly_json()
-            }
-        }
-
-        
-        return [dcc.Graph(figure=loss_fig, id="loss-curve", config={'responsive': True},className="graph"),
-                dcc.Graph(figure=gradient_fig, id="gradient-fig",config={'responsive': True}, className="graph"),
-                dcc.Graph(figure=divergence_fig, id="divergence-fig",config={'responsive': True}, className="graph"),
-                dcc.Graph(figure=results_fig, id="results_fig",config={'responsive': True}, className="graph")],0, False, experiment_state
-                    
-    else: 
-        return no_update
 
 # function takes in the current preset type (custom/rosenbrock/simplex etc..)
 # returns the correct objective function with correct initialisation parameters
@@ -956,11 +635,15 @@ def setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3
 # run a minimisation experiment, taking in single or multiple experiment configurations
 # overlays the graphs to directly compare results immediately
 @callback(
-    Output("experiment-output", "children"),
+    Output("optimisation-path-fig", "figure", allow_duplicate=True),
+    Output("dual-fig", "figure", allow_duplicate=True),
+    Output("gradient-fig", "figure", allow_duplicate=True),
+    Output("divergence-fig", "figure", allow_duplicate=True),
     Output("run-button-minimise", "n_clicks"),
     Output("save-button-minimise", "disabled"), 
     Output("last-min-config", "data"),
-    Output("experiment-metrics", "children"),
+    Output("loading-metrics", "children"),
+    Output("experiment-metrics", "className"),
     Input("run-button-minimise", "n_clicks"),
     State("function-mini-input", "value"),
     State({"type": "initial-value-input", "index": ALL}, "value"),
@@ -983,7 +666,7 @@ def setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3
     State("optim-y-input", "value"),
     State("noise-input", "value"),
     State("preset-function-input", "value"),
-    State("experiment-metrics", "children"),
+    State("loading-metrics", "children"),
     State({"type": "Q-input", "index": ALL}, "value"),
     prevent_initial_call=True,
     allow_duplicate=True,
@@ -1050,7 +733,7 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter,
         for i in range(num_experiments):
             new_metrics.append(construct_experiment_results(i+1, experiment_metrics[i]))
 
-        metrics = [current_metrics[0]] + new_metrics
+        metrics = new_metrics
         # store the run configuration for saving 
         experiments_dict = create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool, q_strings, p1s, p2s, p3s)
         metrics_dict = create_compiled_metrics_dicts(num_experiments, experiment_metrics)
@@ -1078,10 +761,7 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter,
             }
 }
 
-        return [dcc.Graph(figure=optimisation_path_fig, id="optimisation-path-fig", config={'responsive': True},className="graph"),
-                dcc.Graph(figure=dual_fig, id="dual-fig",config={'responsive': True}, className="graph"),
-                dcc.Graph(figure=gradient_fig, id="gradient-fig",config={'responsive': True}, className="graph"),
-                dcc.Graph(figure=divergence_fig, id="divergence-fig",config={'responsive': True}, className="graph")], 0, False, experiment_state, metrics
+        return optimisation_path_fig, dual_fig, gradient_fig, divergence_fig, 0, False, experiment_state, metrics, "experiment-metrics"
     
     else:
         return no_update
@@ -1110,19 +790,6 @@ def create_compiled_metrics_dicts(num_experiments, metric_dicts):
         metric_dict_compiled[f"experiment-{i+1}-metrics"] = metric_dicts[i]
     return metric_dict_compiled
             
-def create_experiment_dict_approx(num_experiments, layers, neurons, epochs, batch_size, lr, bregman, loss):
-    experiments_dict = {}
-    for i in range(num_experiments):
-        experiments_dict[f"experiment-{i+1}"] = {
-            "layers": layers[i],
-            "neurons": neurons[i],
-            "epochs": epochs[i],
-            "learning_rate": lr[i],
-            "batch_size": batch_size[i],
-            "bregman": bregman[i],
-            "loss": loss[i]
-    }
-    return experiments_dict
 
 @callback(
     Output("save-button-minimise", "disabled", allow_duplicate=True),
@@ -1167,49 +834,6 @@ def listen_then_disable_save_min(objective_string, init_x, init_y, iter, lr, bre
         return False
 
 
-# this callback listens for changes in any input paramaters for the approximation variant.
-# if configuration has changed since the last run, then disable the save button to prevent users saving a run that has results for a different configuration
-@callback(
-    Output("save-button-approximate", "disabled", allow_duplicate=True),
-    Input({"type": "layers-input", "index": ALL}, "value"),
-    Input({"type": "neuron-input", "index": ALL}, "value"),
-    Input({"type": "epoch-input", "index": ALL}, "value"),
-    Input("function-input", "value"),
-    Input("data-lbound-input", "value"),
-    Input("data-ubound-input", "value"),
-    Input("num-samples-input", "value"),
-    Input({"type": "batch-size-input", "index": ALL}, "value"),
-    Input({"type": "bregman-input", "index": ALL}, "value"),
-    Input({"type": "loss-input", "index": ALL}, "value"),
-    Input({"type": "lr-input", "index": ALL}, "value"),
-    Input("num-experiments-approx", "data"),
-    State("last-approx-config", "data"),
-    prevent_initial_call=True
-)
-def listen_then_disable_save_approx(layers, neurons, epochs, objective_string, range_min, range_max,
-                        n_samples, batch_size, bregman, loss, lr, num_experiments, last_config):
-    # if num_experiments > len(layers):
-    #     return no_update
-    experiments_dict = create_experiment_dict_approx(num_experiments, layers, neurons, epochs, batch_size, lr, bregman, loss)
-    current_config = {
-            "configuration": {
-                "experiment_type": "approximate",  
-                "function": objective_string,
-                "range_min": range_min,
-                "range_max": range_max,
-                "num_samples": n_samples      
-            }}
-    current_config["experiments"] = experiments_dict
-
-    if last_config == None: 
-        return no_update
-    print(current_config["experiments"])
-    print(last_config["experiments"])
-    if (current_config["configuration"] != last_config["configuration"]) or (current_config["experiments"] != last_config["experiments"]):
-        return True
-    else:
-        return False
-
 
 # replaces "drag and drop..." text with the filename once one has been uploaded 
 @callback(
@@ -1224,14 +848,11 @@ def update_upload_prompt(filename):
 @callback(
     Output("save-config", "data"),
     Output("save-button-minimise", "n_clicks"),
-    Output("save-button-approximate", "n_clicks"),
     Input("save-button-minimise", "n_clicks"),
-    Input("save-button-approximate", "n_clicks"),
     State("last-min-config", "data"),
-    State("last-approx-config", "data"),
     prevent_initial_call=True
 )
-def download_minimise_experiment(n_clicks_min, n_clicks_approx, experiment_data_min, experiment_data_approx):
+def download_minimise_experiment(n_clicks_min, experiment_data_min):
     # triggers a download upon save button being clicked
     # have to store n_clicks in a global dcc.store in order to compare to the save buttons value
     # as this callback gets triggered when the user adds a configuration due to the save button reloading 
@@ -1248,18 +869,8 @@ def download_minimise_experiment(n_clicks_min, n_clicks_approx, experiment_data_
         
         json_str = json.dumps(experiment_data_min, indent=2)
 
-        return dict(content=json_str, filename="experiment.json"), 0, 0
+        return dict(content=json_str, filename="experiment.json"), 0
     
-    elif "save-button-approximate" in triggered_prop:
-        if n_clicks_approx == 0 or not experiment_data_approx:
-            return no_update
-        
-        json_str = json.dumps(experiment_data_approx, indent=2)
-
-        return dict(content=json_str, filename="experiment.json"), 0, 0
-    
-    else: 
-        return no_update
 
 
 # builds a matching minimise-configuration from the saved json
@@ -1270,15 +881,11 @@ def build_minimise_config_from_saved(saved_state):
     experiment_configs = []
     for i in range(len(experiments)):
         exp = experiments.get(f"experiment-{i+1}")
-        experiment_configs.append(construct_mini_settings(i+1,exp.get("initial_value_x"),
-                                                        exp.get("initial_value_y"),
-                                                        exp.get("iterations"),
-                                                        exp.get("learning_rate"),
-                                                        exp.get("p1"),
-                                                        exp.get("p2"),
-                                                        exp.get("p3"),
-                                                        exp.get("Q"),
-                                                        exp.get("bregman"),))
+        config =  construct_mini_settings(i+1,exp.get("initial_value_x"),exp.get("initial_value_y"),exp.get("iterations"),exp.get("learning_rate"),exp.get("p1"),exp.get("p2"),exp.get("p3"),exp.get("Q"),exp.get("bregman"))
+        if i == 0:
+            experiment_configs.append(config)
+        else:
+            experiment_configs.append(html.Div(config, id=f"new-settings-{i+1}", className="option-columns-mlp"))
         
     for i in range(len(experiments)):
         metric = metrics.get(f"experiment-{i+1}-metrics", {})
@@ -1336,61 +943,12 @@ def build_minimise_config_from_saved(saved_state):
     html.Div([
         html.Label("Target q3"),
         dcc.Input(type="number", value=saved_state["configuration"].get("q3"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q3-input")
-    ], className="input-row hidden", id="q3-input-row")] + experiment_configs
+    ], className="input-row hidden", id="q3-input-row"),
+    experiment_configs[0]]
     , className= "settings", id="inner-div")], id="minimise-config", className="option-columns-mlp")
+    full_config = [minimise_config] + experiment_configs[1:]
+    return full_config, metric_configs
 
-    return minimise_config, metric_configs
-
-def build_approximate_config_from_saved(saved_state):
-    experiments = saved_state.get("experiments", {})
-
-    experiment_configs = [] 
-    num_experiments = len(experiments)
-    for i in range(num_experiments):
-        print(i+1)
-        exp = experiments.get(f"experiment-{i+1}")
-        experiment_configs.append([construct_model_settings(i+1, exp.get("layers"),
-                                                            exp.get("neurons"),
-                                                            exp.get("epochs")),
-                                    construct_md_settings(i+1,exp.get("batch_size"),
-                                                            exp.get("bregman"),
-                                                            exp.get("loss"),
-                                                            exp.get("learning_rate"))])
-    settings_divs = []
-    for i in range(1, num_experiments):
-        settings_divs.append(
-            html.Div([
-                experiment_configs[i][0], experiment_configs[i][1]
-            ],id=f"new-settings-{i+1}", className="option-columns-mlp"
-        )
-        )
-    function_md_settings = html.Div([
-        dcc.Markdown("**Function / Data values**"),
-        html.Div([
-            html.Label("Function"),
-            dcc.Input(type="text", value=saved_state["configuration"].get("function", ""), style={"marginBottom": "5px"}, className="input-function", id="function-input")
-        ], className="input-row"),
-        html.Div([
-            html.Label("Input range"),
-            dcc.Input(type="number", value=saved_state["configuration"].get("range_min"), style={"marginBottom": "5px"}, className="input-values", id="data-lbound-input"),
-            dcc.Input(type="number", value=saved_state["configuration"].get("range_max"), style={"marginBottom": "5px"}, className="input-values", id="data-ubound-input"),
-        ], className="input-row"),
-        html.Div([
-            html.Label("Samples"),
-            dcc.Input(type="number", value=saved_state["configuration"].get("num_samples"), style={"marginBottom": "5px"}, className="input-values", id="num-samples-input"),
-        ], className="input-row"),
-        experiment_configs[0][1]
-    
-    ], className="settings", id="function-md-settings")
-
-    if len(experiment_configs) > 1: 
-        approx_config = [html.Div([experiment_configs[0][0], function_md_settings], id="approx-config", className="option-columns-mlp")] +[settings_divs[i] for i in range(len(settings_divs))]
-    else: 
-        approx_config = html.Div([
-            experiment_configs[0][0], function_md_settings],
-        id="approx-config", className="option-columns-mlp")
-
-    return approx_config
 
 # rebuilds the graphs from the saved experiment json
 def build_experiment_results_from_saved(saved_state, type):
@@ -1401,17 +959,16 @@ def build_experiment_results_from_saved(saved_state, type):
     
         if "optim_fig" in figs:
             optim_fig = plotly.Figure(figs["optim_fig"])
-            graphs.append(dcc.Graph(figure=optim_fig, id="optimisation-path-fig", config={'responsive': True}, className="graph"))
+            graphs.append(optim_fig)
         if "dual_optim_fig" in figs:
             dual_fig = plotly.Figure(figs["dual_optim_fig"])
-            graphs.append(dcc.Graph(figure=dual_fig, id="divergence-fig", config={'responsive': True}, className="graph"))
-    
+            graphs.append(dual_fig)
         if "gradient_fig" in figs:
             gradient_fig = plotly.Figure(figs["gradient_fig"])
-            graphs.append(dcc.Graph(figure=gradient_fig, id="gradient-fig", config={'responsive': True}, className="graph"))
+            graphs.append(gradient_fig)
         if "divergence_fig" in figs:
             divergence_fig = plotly.Figure(figs["divergence_fig"])
-            graphs.append(dcc.Graph(figure=divergence_fig, id="divergence-fig", config={'responsive': True}, className="graph"))
+            graphs.append(divergence_fig)
     elif type=="approximate":
         if "loss_fig" in figs:
             loss_fig = plotly.Figure(figs["loss_fig"])
@@ -1430,21 +987,21 @@ def build_experiment_results_from_saved(saved_state, type):
 
 @callback(
     Output("config-options", "children", allow_duplicate=True),
-    Output("experiment-output", "children", allow_duplicate=True),
-    Output("experiment-metrics", "children", allow_duplicate=True),
+    Output("optimisation-path-fig", "figure", allow_duplicate=True),
+    Output("dual-fig", "figure", allow_duplicate=True),
+    Output("gradient-fig", "figure", allow_duplicate=True),
+    Output("divergence-fig", "figure", allow_duplicate=True),
+    Output("loading-metrics", "children", allow_duplicate=True),
     Output("num-experiments-min", "data", allow_duplicate=True),
-    Output("num-experiments-approx", "data", allow_duplicate=True),
     Output("add-button-minimise", "n_clicks", allow_duplicate=True),
-    Output("approx-button", "className", allow_duplicate=True),
-    Output("min-button", "className", allow_duplicate=True),
     Output("experiment-settings-type", "data", allow_duplicate=True),
     Output("minimise-config", "className", allow_duplicate=True),
-    Output("approx-config", "className", allow_duplicate=True),
+    Output("experiment-metrics", "className", allow_duplicate=True),
     Input("upload-load", "n_clicks"),
     State("upload-config", "contents"),
     State("upload-config", "filename"),
     State("config-options", "children"),
-    State("experiment-metrics", "children"),
+    State("loading-metrics", "children"),
     prevent_initial_call=True
 )
 def load_experiment(load_clicks, contents, filename, current_children, current_children_metrics):
@@ -1467,27 +1024,84 @@ def load_experiment(load_clicks, contents, filename, current_children, current_c
 
         minimise_config_new, metrics = build_minimise_config_from_saved(saved_experiment)
         print("minimise config len ", len(minimise_config_new))
-        new_children = current_children[:2] + [minimise_config_new, approx_config] + [current_children[-1]]
+        new_children = current_children[:1] + minimise_config_new + [current_children[-1]]
 
         new_experiment_results = build_experiment_results_from_saved(saved_experiment, "minimise")
-        new_metrics = [current_children_metrics[0]] + metrics
+        new_metrics = metrics
 
-        return new_children, new_experiment_results, new_metrics, num_experiments, no_update, num_experiments, "config-button", "config-button-clicked", "minimise", "option-columns-mlp", "option-columns-mlp hidden"
+        return new_children, new_experiment_results[0], new_experiment_results[1], new_experiment_results[2], new_experiment_results[3],new_metrics, num_experiments, num_experiments, "minimise", "option-columns-mlp", "experiment-metrics"
     
-    elif saved_experiment["configuration"].get("experiment_type") == "approximate":
-        approx_config_new = build_approximate_config_from_saved(saved_experiment)
-        if num_experiments == 1:
-            new_children = current_children[:2] + [minimise_config] + [approx_config_new] + [current_children[-1]]
-        else:
-            new_children = current_children[:2] + [minimise_config] + [approx_config_new[i] for i in range(len(approx_config_new))] + [current_children[-1]]
 
-        new_experiment_results = build_experiment_results_from_saved(saved_experiment, "approximate")
-
-        return new_children, new_experiment_results, no_update, num_experiments, num_experiments, "config-button-clicked", "config-button", "approximate", "option-columns-mlp hidden", "option-columns-mlp"
-
-
-
-
+# callback loads a base experiment when the page initialises
+@callback(
+    Output("config-options", "children", allow_duplicate=True),
+    Output("loading-metrics", "children", allow_duplicate=True),
+    Output("num-experiments-min", "data", allow_duplicate=True),
+    Output("experiment-output", "children", allow_duplicate=True),
+    Output("experiment-metrics", "className", allow_duplicate=True),
+    Input("default-experiment-config", "data"),
+    State("config-options", "children"),
+    State("experiment-metrics", "children"),
+    prevent_initial_call='initial_duplicate',
+)
+def load_default_experiment(saved_experiment, config_children, metrics_children):
+    if saved_experiment is None:
+         raise PreventUpdate
+    minimise_config_new, metrics = build_minimise_config_from_saved(saved_experiment)
+    new_children = config_children[:1] + minimise_config_new + [config_children[-1]]
+    new_metrics = metrics
+    new_experiment_results = build_experiment_results_from_saved(saved_experiment, "minimise")
+    num_experiments = len(saved_experiment.get("experiments", {}))
+    graphs = [dcc.Loading(
+        id="loading-optimisation-path-fig",
+        type="default",
+        color="#e8dac5",
+        overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+        children=dcc.Graph(
+            figure=new_experiment_results[0],
+            id="optimisation-path-fig",
+            config={'responsive': True},
+            className="graph"
+        )
+    ),
+    dcc.Loading(
+        id="loading-dual-fig",
+        type="default",
+        color="#e8dac5",
+        overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+        children=dcc.Graph(
+            figure=new_experiment_results[1],
+            id="dual-fig",
+            config={'responsive': True},
+            className="graph"
+        )
+    ),
+    dcc.Loading(
+        id="loading-gradient-fig",
+        type="default",
+        color="#e8dac5",
+        overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+        children=dcc.Graph(
+            figure=new_experiment_results[2],
+            id="gradient-fig",
+            config={'responsive': True},
+            className="graph"
+        )
+    ),
+    dcc.Loading(
+        id="loading-divergence-fig",
+        type="default",
+        color="#e8dac5",
+        overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+        children=dcc.Graph(
+            figure=new_experiment_results[3],
+            id="divergence-fig",
+            config={'responsive': True},
+            className="graph"
+        )
+    )
+    ]
+    return new_children, new_metrics, num_experiments, graphs, "experiment-metrics"
 
 
 

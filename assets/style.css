@@ -557,8 +557,14 @@ div[id*='"type":"bregman-mini-input"'], #preset-function-input{
     justify-content:flex-start;
 }
 
+
+.loading-figs {
+    max-width: 60%
+}
+
 .experiment-graphs {
-    width: 60%;
+    flex: 0 0 60%;
+    max-width: 60%;
     height: 100%;
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -577,6 +583,7 @@ div[id*='"type":"bregman-mini-input"'], #preset-function-input{
     font-style: normal;
     background: var(--da);
     display: flex;
+    margin-top: 0.5vh;
     border-radius: 5px;
     flex-direction: column;
     align-self: flex-start;
@@ -586,7 +593,6 @@ div[id*='"type":"bregman-mini-input"'], #preset-function-input{
 
 .experiment-result { 
     display: block;
-
 }
 
 #metrics-header {
