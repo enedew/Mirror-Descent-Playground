@@ -25,7 +25,7 @@ There are several pre-configured experiments which you can load. Alternatively y
 and upload the configuration to run again.
 """
 
-default_config_path = os.path.join(os.path.dirname(__file__), '../experiment(12).json')
+default_config_path = os.path.join(os.path.dirname(__file__), '../experiment(13).json')
 with open(default_config_path, 'r') as f:
     default_config = json.load(f)
 
@@ -635,10 +635,7 @@ def setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3
 # run a minimisation experiment, taking in single or multiple experiment configurations
 # overlays the graphs to directly compare results immediately
 @callback(
-    Output("optimisation-path-fig", "figure", allow_duplicate=True),
-    Output("dual-fig", "figure", allow_duplicate=True),
-    Output("gradient-fig", "figure", allow_duplicate=True),
-    Output("divergence-fig", "figure", allow_duplicate=True),
+    Output("experiment-output", "children"),
     Output("run-button-minimise", "n_clicks"),
     Output("save-button-minimise", "disabled"), 
     Output("last-min-config", "data"),
@@ -754,14 +751,62 @@ def run_experiment_minimise(n_clicks, objective_string, init_x, init_y, iter,
             "experiments": experiments_dict,
             "metrics": metrics_dict,
             "figures": {
-                "optim_fig": optimisation_path_fig.to_plotly_json(),
-                "dual_optim_fig": dual_fig.to_plotly_json(),
-                "gradient_fig": gradient_fig.to_plotly_json(),
-                "divergence_fig": divergence_fig.to_plotly_json(),
+                "optim_fig": pio.to_json(optimisation_path_fig),
+                "dual_optim_fig": pio.to_json(dual_fig),
+                "gradient_fig": pio.to_json(gradient_fig),
+                "divergence_fig": pio.to_json(divergence_fig),
             }
 }
 
-        return optimisation_path_fig, dual_fig, gradient_fig, divergence_fig, 0, False, experiment_state, metrics, "experiment-metrics"
+        return [dcc.Loading(
+        id="loading-optimisation-path-fig",
+        type="default",
+        color="#e8dac5",
+        overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+        children=dcc.Graph(
+            figure=optimisation_path_fig,
+            id="optimisation-path-fig",
+            config={'responsive': True},
+            className="graph"
+        )
+    ),
+    dcc.Loading(
+        id="loading-dual-fig",
+        type="default",
+        color="#e8dac5",
+        overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+        children=dcc.Graph(
+            figure=dual_fig,
+            id="dual-fig",
+            config={'responsive': True},
+            className="graph"
+        )
+    ),
+    dcc.Loading(
+        id="loading-gradient-fig",
+        type="default",
+        color="#e8dac5",
+        overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+        children=dcc.Graph(
+            figure=gradient_fig,
+            id="gradient-fig",
+            config={'responsive': True},
+            className="graph"
+        )
+    ),
+    dcc.Loading(
+        id="loading-divergence-fig",
+        type="default",
+        color="#e8dac5",
+        overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+        children=dcc.Graph(
+            figure=divergence_fig,
+            id="divergence-fig",
+            config={'responsive': True},
+            className="graph"
+        )
+    )
+    ], 0, False, experiment_state, metrics, "experiment-metrics"
     
     else:
         return no_update
@@ -950,6 +995,7 @@ def build_minimise_config_from_saved(saved_state):
     return full_config, metric_configs
 
 
+import plotly.io as pio 
 # rebuilds the graphs from the saved experiment json
 def build_experiment_results_from_saved(saved_state, type):
     
@@ -958,16 +1004,16 @@ def build_experiment_results_from_saved(saved_state, type):
     if type=="minimise":
     
         if "optim_fig" in figs:
-            optim_fig = plotly.Figure(figs["optim_fig"])
+            optim_fig = pio.from_json(figs["optim_fig"])
             graphs.append(optim_fig)
         if "dual_optim_fig" in figs:
-            dual_fig = plotly.Figure(figs["dual_optim_fig"])
+            dual_fig = pio.from_json(figs["dual_optim_fig"])
             graphs.append(dual_fig)
         if "gradient_fig" in figs:
-            gradient_fig = plotly.Figure(figs["gradient_fig"])
+            gradient_fig = pio.from_json(figs["gradient_fig"])
             graphs.append(gradient_fig)
         if "divergence_fig" in figs:
-            divergence_fig = plotly.Figure(figs["divergence_fig"])
+            divergence_fig = pio.from_json(figs["divergence_fig"])
             graphs.append(divergence_fig)
     elif type=="approximate":
         if "loss_fig" in figs:
@@ -1032,7 +1078,7 @@ def load_experiment(load_clicks, contents, filename, current_children, current_c
         return new_children, new_experiment_results[0], new_experiment_results[1], new_experiment_results[2], new_experiment_results[3],new_metrics, num_experiments, num_experiments, "minimise", "option-columns-mlp", "experiment-metrics"
     
 
-# callback loads a base experiment when the page initialises
+#callback loads a base experiment when the page initialises
 @callback(
     Output("config-options", "children", allow_duplicate=True),
     Output("loading-metrics", "children", allow_duplicate=True),
