@@ -25,7 +25,7 @@ There are several pre-configured experiments which you can load. Alternatively y
 and upload the configuration to run again.
 """
 
-default_config_path = os.path.join(os.path.dirname(__file__), '../base_experiment.json')
+default_config_path = os.path.join(os.path.dirname(__file__), '../experiment(12).json')
 with open(default_config_path, 'r') as f:
     default_config = json.load(f)
 
