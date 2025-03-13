@@ -1,0 +1,149 @@
+from dash import html
+from FunctionParser import FunctionParser
+from PresetFuncs import AnisotropicQuadratic, SimplexObjective, CubicObjective, Rosenbrock, Rastrigin, Booth, Ackley, ExponentialObjective2D
+import torch
+
+def construct_experiment_results(idx, metrics_dict):
+       # function converts the metrics_dict into a table
+    table_rows = []
+    for key, value in metrics_dict.items():
+        
+        if isinstance(value, list):
+            # skip arrays like step_sizes
+            continue
+        elif isinstance(value, float):
+            if abs(value) > 1e6:
+                display_value = f"{value:.3e}"
+            else:
+                display_value = f"{value:.5f}"
+            row_value = str(display_value)
+        else:
+            row_value = str(value)
+        table_rows.append(
+            html.Tr(
+                [
+                    html.Td(key, className="metric-name"),
+                    html.Td(row_value, className="metric-value")
+                ],
+                id={'type': 'metric-row', 'metric': key, 'table': idx},
+                n_clicks=0,
+                style={'cursor': 'pointer'}  # visually indicate that the row is clickable
+            )
+        )
+
+    return html.Div([
+        html.H4(f"Experiment {idx} results", className="experiment-header"),
+        html.Table(
+            className="metrics-table",
+            children=[html.Tbody(table_rows)]
+        )
+    ],
+    className="experiment-result",
+    id={"type": "experiment-result", "index": idx})
+
+def setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3s):
+    if preset_function == "CUSTOM":
+            if second_input_bool[0]==False:
+                inits = [[float(x), float(y)] for x, y in zip(init_x, init_y)]
+                print("?")
+                dim = 2
+                test = [1, 2]
+            else: 
+                inits = [float(x) for x in init_x]
+                dim = 1
+                test = 1
+    elif preset_function == "SIMPLEX":
+        inits = [[float(p1), float(p2), float(p3)] for p1, p2, p3 in zip(p1s, p2s, p3s)]
+        dim = 3
+    else:
+        inits = [[float(x), float(y)] for x, y in zip(init_x, init_y)]
+        dim = 2
+    return inits, dim
+
+def get_objective_function(preset_value, objective_string, a, b, q1, q2, q3, optx, opty, noise_std=0.0):
+    if preset_value == "CUSTOM":
+        # use the function parser for custom functions to generate the lambda expression
+        parser = FunctionParser(objective_string)
+        return parser.string_to_lambda()  
+    else:
+        presets = {
+            "ANISO": lambda: AnisotropicQuadratic(a=float(a),
+                                                  b=float(b),
+                                                  optimum=torch.tensor([optx, opty]),
+                                                  noise_std=noise_std),
+            "SIMPLEX": lambda: SimplexObjective(weights=torch.tensor([q1, q2, q3]),
+                                                noise_std=noise_std),
+            "ROSENBROCK": lambda: Rosenbrock(a=float(a),
+                                             b=float(b),
+                                             noise_std=noise_std),
+            "RASTRIGIN": lambda: Rastrigin(noise_std=noise_std),
+            "BOOTH": lambda: Booth(noise_std=noise_std),
+            "ACKLEY": lambda: Ackley(noise_std=noise_std),
+            "CUBIC": lambda: ExponentialObjective2D(optimum = torch.tensor([optx, opty]), noise_std=noise_std),
+            "EXPONENTIAL": lambda: CubicObjective(optimum = torch.tensor([optx, opty]), noise_std=noise_std)
+        }
+        return presets[preset_value]()
+    
+
+def construct_experiment_results(idx, metrics_dict):
+       # function converts the metrics_dict into a table
+    table_rows = []
+    for key, value in metrics_dict.items():
+        
+        if isinstance(value, list):
+            # skip arrays like step_sizes
+            continue
+        elif isinstance(value, float):
+            if abs(value) > 1e6:
+                display_value = f"{value:.3e}"
+            else:
+                display_value = f"{value:.5f}"
+            row_value = str(display_value)
+        else:
+            row_value = str(value)
+        table_rows.append(
+            html.Tr(
+                [
+                    html.Td(key, className="metric-name"),
+                    html.Td(row_value, className="metric-value")
+                ],
+                id={'type': 'metric-row', 'metric': key, 'table': idx},
+                n_clicks=0,
+                style={'cursor': 'pointer'}  # visually indicate that the row is clickable
+            )
+        )
+
+    return html.Div([
+        html.H4(f"Experiment {idx} results", className="experiment-header"),
+        html.Table(
+            className="metrics-table",
+            children=[html.Tbody(table_rows)]
+        )
+    ],
+    className="experiment-result",
+    id={"type": "experiment-result", "index": idx})
+
+
+def create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool, qs, p1s, p2s, p3s):
+    experiments_dict = {}
+    for i in range(num_experiments):
+        experiments_dict[f"experiment-{i+1}"] = {
+            "initial_value_x": init_x[i],
+            "initial_value_y": init_y[i],
+            "iterations": iter[i],
+            "learning_rate": lr[i],
+            "bregman": bregman[i],
+            "p1": p1s[i],
+            "p2": p2s[i],
+            "p3": p3s[i],
+            "Q": qs[i] 
+    }
+    return experiments_dict
+
+
+def create_compiled_metrics_dicts(num_experiments, metric_dicts):
+    metric_dict_compiled = {}
+    for i in range(num_experiments):
+        metric_dict_compiled[f"experiment-{i+1}-metrics"] = metric_dicts[i]
+    return metric_dict_compiled
+            

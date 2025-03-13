@@ -99,3 +99,24 @@ class Ackley(ObjectiveFunction):
         term1 = -20 * torch.exp(-0.2 * torch.sqrt(0.5 * ( x[0]**2 + x[1]**2 )))
         term2 = -torch.exp(0.5 * (torch.cos(2*torch.pi*x[0]) + torch.cos(2*torch.pi*x[1])))
         return term1 + term2 + 20 + torch.exp(torch.tensor(1.0, dtype=x.dtype, device=x.device))
+
+
+class CubicObjective(ObjectiveFunction):
+    def __init__(self, optimum=torch.tensor([1.0, 1.0]), noise_std=0.0):
+        super().__init__(optimum=optimum, name="2D Cubic Objective", noise_std=noise_std)
+    
+    def _compute(self, x):
+        
+        term1 = torch.pow(torch.abs(x[0] - self.optimum[0]), 3)
+        term2 = torch.pow(torch.abs(x[1] - self.optimum[1]), 3)
+        return (1/3) * (term1 + term2)
+    
+class ExponentialObjective2D(ObjectiveFunction):
+    def __init__(self, optimum=torch.tensor([1.0, 1.0]), noise_std=0.0):
+        super().__init__(optimum=optimum, name="2D Exponential Objective", noise_std=noise_std)
+    
+    def _compute(self, x):
+        # f(x) = exp(x[0]-opt[0]) - (x[0]-opt[0]) + exp(x[1]-opt[1]) - (x[1]-opt[1])
+        term1 = torch.exp(x[0] - self.optimum[0]) - (x[0] - self.optimum[0])
+        term2 = torch.exp(x[1] - self.optimum[1]) - (x[1] - self.optimum[1])
+        return term1 + term2

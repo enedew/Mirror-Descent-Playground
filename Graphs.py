@@ -778,7 +778,7 @@ class Graphs():
         updated_gradient =self.add_gradient_norm(gradient_logs=gradient_logs, exp_number=exp_number)
         updated_divergence = self.add_divergence(divergence_logs=divergence_logs, exp_number=exp_number)
         updated_dual = self.add_dual_space_trajectory(dual_logs=dual_logs, exp_number=exp_number, dim=dim)
-        return updated_optimisation, updated_gradient, updated_divergence, updated_dual
+        return (updated_optimisation, updated_gradient, updated_divergence, updated_dual)
 
     def update_all_graphs_approx(self, loss_logs, gradient_logs, divergence_logs, prediction_data, exp_number):
         updated_loss = self.add_loss_curve(loss_logs=loss_logs, exp_number=exp_number)

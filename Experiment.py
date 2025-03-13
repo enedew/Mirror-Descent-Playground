@@ -34,7 +34,9 @@ class ExperimentMD():
             # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
             'KL' : lambda x: torch.sum((x+1e-8) * torch.log(x +1e-8)),
             'MAHALANOBIS': lambda x: 0.5 * torch.sum(x * (self.Q @ x)),
-            'ITAKURA-SAITO': lambda x: -torch.sum(torch.log(x + 1e-8))
+            'ITAKURA-SAITO': lambda x: -torch.sum(torch.log(x + 1e-8)),
+            'POWER3'         : lambda x: (1/3) * torch.sum(torch.abs(x)**3),
+            'EXPONENTIAL'    : lambda x: torch.sum(torch.exp(x) - 1)
         }
         # approximation logs
         self.metrics = []
@@ -417,8 +419,6 @@ class ExperimentMD():
                 for param in group['params']:
                     old_params.append(param.data.clone())
 
-            print(x)
-            print(self.Q)
             self.optimiser.step()
 
 
@@ -427,7 +427,7 @@ class ExperimentMD():
             # other mirror maps need to be projected back onto the simplex through normalisation at every step
             if self.bregman == "KL" or simplex:
                 x.data = x.data / x.data.sum()
-            # recording the iteration run time
+            #recording the iteration run time
             iter_elapsed = time.time() - iter_start_time
             self.iter_times.append(iter_elapsed)
 
@@ -441,7 +441,7 @@ class ExperimentMD():
                     self.calculate_record_average_bregman_divergence(old_params, self.bregman)
                     self.minimisation_guesses.append(x.detach().cpu().numpy().copy())
                     break
-
+            
             # calculate and record the bregman divergence between params of this iteration and the next
             self.calculate_record_average_bregman_divergence(old_params, self.bregman)
 

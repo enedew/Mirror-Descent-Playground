@@ -14,7 +14,9 @@ mirror_map_dict = {
     'MAHALANOBIS': lambda x: torch.matmul(Q, x),
     # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
     'KL' : lambda x: torch.log(x + 1e-8)+1,
-    'ITAKURA-SAITO': lambda x: -1.0/x
+    'ITAKURA-SAITO': lambda x: -1.0/x,
+    "POWER3": lambda x: torch.sign(x) * torch.pow(torch.abs(x), 2),
+    'EXPONENTIAL': lambda x: torch.exp(x)
 } 
 
 # dictionary of inverse mirror maps for different bregman divergences 
@@ -23,7 +25,10 @@ inv_mirror_map_dict = {
     'EUCLID' : lambda x: x,
     'MAHALANOBIS': lambda x: torch.matmul(Q_inv, x),
     'KL' : lambda x: torch.exp(x-1),
-    'ITAKURA-SAITO': lambda x: -1.0/x 
+    'ITAKURA-SAITO': lambda x: -1.0/x,
+    'POWER3': lambda x: torch.sign(x) * torch.sqrt(torch.abs(x)),
+    'EXPONENTIAL': lambda x: torch.log(x)
+
 }
 
 
@@ -37,8 +42,10 @@ class MirrorDescent(Optimizer):
             'EUCLID' : lambda x: x,
             'MAHALANOBIS': lambda x: torch.matmul(Q, x),
             # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
-            'KL' : lambda x: torch.log(x + 1e-8)+1,
-            'ITAKURA-SAITO': lambda x: -1.0/x
+            'KL' : lambda x: torch.log(x)+1,
+            'ITAKURA-SAITO': lambda x: -1.0/x,
+            "POWER3": lambda x: torch.sign(x) * torch.pow(torch.abs(x), 2),
+            'EXPONENTIAL': lambda x: torch.exp(x)
         } 
 
         # dictionary of inverse mirror maps for different bregman divergences 
@@ -47,7 +54,10 @@ class MirrorDescent(Optimizer):
             'EUCLID' : lambda x: x,
             'MAHALANOBIS': lambda x: torch.matmul(Q_inv, x),
             'KL' : lambda x: torch.exp(x-1),
-            'ITAKURA-SAITO': lambda x: -1.0/x 
+            'ITAKURA-SAITO': lambda x: -1.0/x,
+            'POWER3': lambda x: torch.sign(x) * torch.sqrt(torch.abs(x)),
+            'EXPONENTIAL': lambda x: torch.log(x)
+
         }
         self.grad_psi = self.mirror_map_dict[bregman]
         self.inv_grad_psi = self.inv_mirror_map_dict[bregman]
