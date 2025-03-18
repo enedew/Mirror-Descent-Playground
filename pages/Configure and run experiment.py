@@ -71,35 +71,38 @@ def build_experiment_results_from_saved(saved_state, type):
 
 new_experiment_results = build_experiment_results_from_saved(default_config, "minimise")
 
-graphs_row1 = html.Div([dcc.Loading(
-        id="loading-optimisation-path-fig",
-        type="default",
-        color="#e8dac5",
-        delay_show=500,
-        className="first-row",
+graphs_row1 = html.Div([
+    html.Div([
+        dcc.Loading(
+            id="loading-optimisation-path-fig",
+            type="default",
+            color="#e8dac5",
+            delay_show=500,
+            className="first-row",
 
-        overlay_style={"visibility":"visible", "filter": "blur(2px)"},
-        children=dcc.Graph(
-            figure=new_experiment_results[0],
-            id="optimisation-path-fig",
-            config={'responsive': True},
-            className="graph animate-slide-in",
-        )
-    ),
-    dcc.Loading(
-        id="loading-optimisation-path-fig-3d",
-        type="default",
-        color="#e8dac5",
-        className="first-row",
-        delay_show=500,
-        overlay_style={"visibility":"visible", "filter": "blur(2px)"},
-        children=dcc.Graph(
-            figure=new_experiment_results[1],
-            id="optimisation-path-fig-3d",
-            config={'responsive': True},
-            className="graph animate-slide-in",
-        )
-    )], className="first-row")
+            overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+            children=dcc.Graph(
+                figure=new_experiment_results[0],
+                id="optimisation-path-fig",
+                config={'responsive': True},
+                className="graph animate-slide-in",
+            )
+        )], id="optim-container"),
+    html.Div([
+        dcc.Loading(
+            id="loading-optimisation-path-fig-3d",
+            type="default",
+            color="#e8dac5",
+            className="first-row",
+            delay_show=500,
+            overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+            children=dcc.Graph(
+                figure=new_experiment_results[1],
+                id="optimisation-path-fig-3d",
+                config={'responsive': True},
+                className="graph animate-slide-in",
+            )
+        )], id="optim-3d-container")], className="first-row")
 
 graphs_row2 = html.Div([
     dcc.Loading(
@@ -125,7 +128,7 @@ graphs_row2 = html.Div([
         className="second-row",
         overlay_style={"visibility":"visible", "filter": "blur(2px)"},
         children=dcc.Graph(
-            figure=new_experiment_results[3],
+            figure=new_experiment_results[4],
             id="gradient-fig",
             config={'responsive': True},
             className="graph animate-slide-in"
@@ -139,16 +142,27 @@ graphs_row2 = html.Div([
         className="second-row",
 
         overlay_style={"visibility":"visible", "filter": "blur(2px)"},
-        children=dcc.Graph(
-            figure=new_experiment_results[4],
+        children=[
+            dcc.Graph(
+            figure=new_experiment_results[3],
             id="divergence-fig",
             config={'responsive': True},
             className="graph animate-slide-in"
-        )
+        )]
     )
     ], className="second-row")
 
-experiment_figs = html.Div([graphs_row1, graphs_row2], id="experiment-output", className="experiment-graphs")
+displaying_point_values_div = html.Div([
+    dcc.Markdown(children="Figures to display: ", id="logging-markdown", className="logging-markdown"),
+    html.Button("Trajectory (3D)", className="fig-button clicked", id="optim-3d-button"),
+    html.Button("Trajectory (Contour)", className="fig-button clicked", id="optim-contour-button"),
+    html.Button("Bregman Divergence", className="fig-button clicked", id="div-button"),
+    html.Button("Gradient Norm", className="fig-button clicked", id="grad-button"),
+    html.Button("Trajectory (Dual Space)", className="fig-button clicked", id="dual-button"),
+
+],id="hovered-values", className="log-container")
+
+experiment_figs = html.Div([displaying_point_values_div, graphs_row1, graphs_row2], id="experiment-output", className="experiment-graphs")
 
 
 # constructor functions 
@@ -274,104 +288,8 @@ minimise_config = html.Div([html.Div([
     construct_mini_settings(1)
 ], className= "settings", id="inner-div")], id="minimise-config", className="option-columns-mlp")
 
-import copy
+
 import re
-@callback(
-    Output('dual-fig', 'figure'),
-    Output('gradient-fig', 'figure'),
-    Output('divergence-fig', 'figure'),
-    Input('optimisation-path-fig', 'hoverData'),
-    State('optimisation-path-fig', 'figure'),
-    State('dual-fig', 'figure'),
-    State('gradient-fig', 'figure'),
-    State('divergence-fig', 'figure'),
-    prevent_initial_call=True
-)
-def sync_hover_across_graphs(hoverData, optim_fig, dual_fig, grad_fig, div_fig):
-    # Work on deep copies so the originals aren’t modified in-place.
-    dual_fig = copy.deepcopy(dual_fig)
-    grad_fig = copy.deepcopy(grad_fig)
-    div_fig = copy.deepcopy(div_fig)
-    
-    # Remove any existing highlight traces (assumed to have name 'Highlight')
-    def remove_highlights(fig):
-        fig['data'] = [trace for trace in fig['data'] if trace.get('name') != 'Highlight']
-        return fig
-
-    dual_fig = remove_highlights(dual_fig)
-    grad_fig = remove_highlights(grad_fig)
-    div_fig = remove_highlights(div_fig)
-    
-    # If no hover data, simply return the figures unchanged.
-    if hoverData is None:
-        return dual_fig, grad_fig, div_fig
-
-    # Extract information from the hover event in the optimisation graph.
-    point = hoverData['points'][0]
-    point_index = point.get('pointIndex')
-    curve_number = point.get('curveNumber')
-    if curve_number is None:
-        return dual_fig, grad_fig, div_fig
-
-    # Use the optimisation figure to get the trace that triggered the hover.
-    try:
-        hovered_trace = optim_fig['data'][curve_number]
-    except Exception:
-        return dual_fig, grad_fig, div_fig
-
-    trace_name = hovered_trace.get('name', '')
-    # If the hovered trace is a static trace (e.g. the objective function), ignore it.
-    if "objective" in trace_name.lower():
-        return dual_fig, grad_fig, div_fig
-
-    # Extract the experiment number from the trace name.
-    # For example, a name "(1)" or "1" will yield the experiment number 1.
-    match = re.search(r'\d+', trace_name)
-    if not match:
-        return dual_fig, grad_fig, div_fig
-    exp_num = int(match.group(0))
-    
-    # Define a helper that adds highlight markers to traces matching the experiment number.
-    def add_highlight(fig):
-        highlight_traces = []
-        for trace in fig.get('data', []):
-            # Skip contour traces
-            if trace.get('type') == 'contour':
-                continue
-            candidate = False
-            candidate_name = trace.get('name', '')
-            # Try to extract a number from the trace's name.
-            try:
-                candidate_num = int(''.join(filter(str.isdigit, candidate_name)))
-            except Exception:
-                candidate_num = None
-            # For experiment 1, also accept the name "dual trajectory" (used in your dual graph).
-            if exp_num == 1 and candidate_name.lower() == "dual trajectory":
-                candidate = True
-            elif candidate_num is not None and candidate_num == exp_num:
-                candidate = True
-
-            if candidate:
-                xs = trace.get('x', [])
-                ys = trace.get('y', [])
-                # Check that the hovered point index is valid.
-                if point_index < len(xs) and point_index < len(ys):
-                    highlight_traces.append({
-                        'x': [xs[point_index]],
-                        'y': [ys[point_index]],
-                        'mode': 'markers',
-                        'marker': {'size': 4, 'color': '#322634'},
-                        'name': 'Highlight'
-                    })
-        # Append all the highlight markers to the figure.
-        fig['data'].extend(highlight_traces)
-        return fig
-
-    dual_fig = add_highlight(dual_fig)
-    grad_fig = add_highlight(grad_fig)
-    div_fig = add_highlight(div_fig)
-
-    return dual_fig, grad_fig, div_fig
 
 def construct_experiment_results(idx, metrics_dict):
        # function converts the metrics_dict into a table
@@ -478,6 +396,7 @@ experiment_results = html.Div([
             color="#e8dac5",
             delay_show=500,
             children=None),
+        html.Div([], className="bottom-container", id="metrics-bottom")
     ], id="experiment-metrics", className="experiment-metrics hidden")
 
 experiment_settings_type_store = dcc.Store(id="experiment-settings-type", data="minimise")
@@ -487,8 +406,7 @@ config_options = html.Div([
     minimise_config,
     run_button_container,
     html.Div([
-        dcc.Markdown(children="", id="logging-markdown", className="logging-markdown")
-    ], id="log-container", className="log-container"),
+    ], id="configuration-bottom", className="bottom-container"),
     
 ], className="configuration-options", id="config-options")
 
@@ -520,6 +438,8 @@ metrics = dcc.Store(id="metrics", data=[])
 trigger_next = dcc.Store(id="trigger-next", data=None)
 experiment_parameters = dcc.Store(id="experiment-params", data=None)
 experiment_dict = dcc.Store(id="experiment-dict", data=None)
+
+experiment_running = dcc.Store(id="experiment-running", data=False)
 
 # dim store 
 dim_store = dcc.Store(id="dim-store", data=1)
@@ -579,9 +499,10 @@ layout = html.Div([
     trigger_next,
     experiment_parameters,
     experiment_dict,
+    experiment_running,
     dcc.Interval(
         id='experiment-interval',
-        interval=5000,  # in milliseconds (1 second interval, adjust as needed)
+        interval=1500,  # in milliseconds (1 second interval, adjust as needed)
         n_intervals=0,
         disabled=True  # Initially disabled
     ),
@@ -595,36 +516,131 @@ layout = html.Div([
 ], style={"padding": "5px 20px 20px 20px"})
 
 
-# clientside_callback(
-#     """
-#     function(n_clicks, num_experiments) {
-#         if (n_clicks > 0) {
-#             // Get all configuration panels by class name.
-#             var configs = document.querySelectorAll('.option-columns-mlp');
-#             if (configs.length > 0) {
-#                 // Assume we want to remove the last configuration panel.
-#                 var target = configs[configs.length - 2];
-#                 // Add the slide-out animation class.
-#                 target.classList.add("animate-slide-out");
-#                 // After the animation duration (500ms), remove the element.
-#                 setTimeout(function(){
-#                     if (target && target.parentNode) {
-#                         target.parentNode.removeChild(target);
-#                     }
-#                 }, 500);
-#             }
-#         }
-#         // Return a dummy value (required output) – you can bind this to a dummy div.
-#         return "";
-#     }
-#     """,
-#     Output("dummy-output", "children"), 
-#     Input("remove-button-minimise", "n_clicks"),
-#     State("num-experiments-min", "data"),
-#     prevent_initial_call=True
-# )
 
-# callback to hide/show necessary/optional inputs for each function preset
+
+# callback highlights corresponding points on gradient, divergence and dual space traj graphs when hovering over a point
+# on the primal space traj graphs
+@callback(
+    Output('dual-fig', 'figure', allow_duplicate=True),
+    Output('gradient-fig', 'figure', allow_duplicate=True),
+    Output('divergence-fig', 'figure', allow_duplicate=True),
+    Input('optimisation-path-fig', 'hoverData'),
+    Input('optimisation-path-fig-3d', 'hoverData'),
+    State('optimisation-path-fig', 'figure'),
+    State('optimisation-path-fig-3d', 'figure'),
+    State('dual-fig', 'figure'),
+    State('gradient-fig', 'figure'),
+    State('divergence-fig', 'figure'),
+    prevent_initial_call=True
+)
+def sync_hover_others(hover2d, hover3d, fig2d, fig3d, dual_fig, grad_fig, div_fig):
+    
+    from dash import callback_context
+
+    # use callback_context to see which input triggered the callback
+    ctx = callback_context
+    active_hover = None
+    source_fig = None
+
+    if ctx.triggered:
+        triggered_id = ctx.triggered[0]['prop_id']
+        # if the 3d figure triggered the callback, use its hoverData
+        if triggered_id.startswith('optimisation-path-fig-3d'):
+            active_hover = hover3d
+            source_fig = fig3d
+        # if the 2d figure triggered the callback, use its hoverData
+        elif triggered_id.startswith('optimisation-path-fig'):
+            active_hover = hover2d
+            source_fig = fig2d
+
+    # if none triggered (or if the triggered value is empty), fallback to prefer 3d hoverData if available
+    if active_hover is None:
+        active_hover = hover3d if hover3d is not None else hover2d
+        source_fig = fig3d if hover3d is not None else fig2d
+
+    # clone only the figures we need to update (dual, gradient, divergence)
+    def clone_fig(fig):
+        return {
+            'data': [trace.copy() for trace in fig.get('data', [])],
+            'layout': fig.get('layout', {}).copy()
+        }
+    new_dual = clone_fig(dual_fig)
+    new_grad = clone_fig(grad_fig)
+    new_div = clone_fig(div_fig)
+
+    # remove any existing highlight traces (with name exactly 'Highlight')
+    def remove_highlights(fig):
+        fig['data'] = [trace for trace in fig.get('data', []) if trace.get('name') != 'Highlight']
+        return fig
+    new_dual = remove_highlights(new_dual)
+    new_grad = remove_highlights(new_grad)
+    new_div = remove_highlights(new_div)
+
+    if active_hover is None:
+        return new_dual, new_grad, new_div
+
+    try:
+        point = active_hover['points'][0]
+    except (KeyError, IndexError):
+        return new_dual, new_grad, new_div
+
+    # get the hovered point index, using pointIndex (2d) or falling back to pointNumber (3d)
+    pt_index = point.get('pointIndex') or point.get('pointNumber')
+    if pt_index is None:
+        return new_dual, new_grad, new_div
+
+    # get the curve index; if not provided, default to 0
+    curve_idx = point.get('curveNumber', 0)
+    try:
+        hovered_trace = source_fig['data'][curve_idx]
+    except (KeyError, IndexError):
+        return new_dual, new_grad, new_div
+
+    trace_name = hovered_trace.get('name', '')
+    # ignore static traces such as the objective function trace
+    if "objective" in trace_name.lower():
+        return new_dual, new_grad, new_div
+
+    # extract the experiment number from the trace name (e.g. "(1)" or "1")
+    m = re.search(r'\d+', trace_name)
+    if not m:
+        return new_dual, new_grad, new_div
+    exp_num = int(m.group(0))
+
+    # helper: add a highlight marker to each trace in a figure that corresponds to the experiment number
+    def add_highlight(fig):
+        highlights = []
+        for tr in fig.get('data', []):
+            # skip contour traces
+            if tr.get('type') == 'contour':
+                continue
+            candidate_name = tr.get('name', '')
+            try:
+                candidate_num = int(''.join(filter(str.isdigit, candidate_name)))
+            except Exception:
+                candidate_num = None
+            # also accept a trace named "dual trajectory" for experiment 1
+            if (exp_num == 1 and candidate_name.lower() == "dual trajectory") or \
+               (candidate_num is not None and candidate_num == exp_num):
+                xs = tr.get('x', [])
+                ys = tr.get('y', [])
+                if pt_index < len(xs) and pt_index < len(ys):
+                    highlights.append({
+                        'x': [xs[pt_index]],
+                        'y': [ys[pt_index]],
+                        'mode': 'markers',
+                        'marker': {'size': 4, 'color': '#322634'},
+                        'name': 'Highlight'
+                    })
+        fig['data'].extend(highlights)
+        return fig
+
+    new_dual = add_highlight(new_dual)
+    new_grad = add_highlight(new_grad)
+    new_div = add_highlight(new_div)
+
+    return new_dual, new_grad, new_div
+
 @callback(
     Output("a-input-row", "className"),
     Output("b-input-row", "className"),
@@ -819,7 +835,7 @@ def show_Q_input(bregman_fields, function_preset):
         if function_preset == "SIMPLEX": 
             q_default_values.append("3, 0, 0, 0, 3, 0, 0, 0, 3")
         else:
-            q_default_values.append(no_update)
+            q_default_values.append("2, 0, 0, 1")
 
 
     return new_q_input_classes, q_default_values
@@ -1097,6 +1113,47 @@ def build_minimise_config_from_saved(saved_state):
     return full_config, metric_configs
 
 
+# updates which figures are currently being displayed as per the users choice
+@callback(
+    Output("optim-3d-button", "className"),
+    Output("optim-contour-button", "className"),
+    Output("div-button", "className"),
+    Output("grad-button", "className"),
+    Output("dual-button", "className"),
+    Output("optim-3d-container", "className"),
+    Output("optimisation-path-fig", "className"),
+    Output("divergence-fig", "className"),
+    Output("gradient-fig", "className"),
+    Output("dual-fig", "className"),
+    Input("optim-3d-button", "n_clicks"),
+    Input("optim-contour-button", "n_clicks"),
+    Input("div-button", "n_clicks"),
+    Input("grad-button", "n_clicks"),
+    Input("dual-button", "n_clicks"),
+    State("optim-3d-button", "className"),
+    State("optim-contour-button", "className"),
+    State("div-button", "className"),
+    State("grad-button", "className"),
+    State("dual-button", "className"),
+)
+def update_displayed_figures(o3d_button_clicks, o_button_clicks, div_button_clicks, grad_button_clicks, dual_button_clicks,
+                             o3d_button_class, o_button_class, div_button_class, grad_button_class, dual_button_class):
+    ctx = callback_context
+    if not ctx.triggered:
+        return no_update
+
+    triggered_prop = ctx.triggered[0]["prop_id"]
+    print(triggered_prop)
+    if triggered_prop == "optim-3d-button.n_clicks":
+        if o3d_button_class == "fig-button clicked":
+            return ["fig-button"] + [no_update]*4 + ["true-hidden"] + [no_update]*4
+        else:
+            return ["fig-button clicked"] + [no_update]*4 + [""]+ [no_update]*4
+    else:
+        return no_update
+
+
+
 
 # rebuilds the graphs from the saved experiment json
 @callback(
@@ -1301,7 +1358,8 @@ def update_expnumber(current_experiment):
     prevent_initial_call=True,
 )
 def run_next_experiment(triggered, current_experiment, params, metrics,  num_experiments, experiment_dict,
-                         optimisation_path_fig, optimisation_path_fig_3d, dual_fig, divergence_fig, gradient_fig, q_store, current_metrics_div, interval_disabled):
+                        optimisation_path_fig, optimisation_path_fig_3d, dual_fig, divergence_fig, gradient_fig,
+                        q_store, current_metrics_div, interval_disabled):
     print("run next experiment ran")
     print(triggered)
     print(interval_disabled)
@@ -1372,3 +1430,148 @@ def load_default_experiment(saved_experiment, config_children, metrics_children)
     return new_children, new_metrics, num_experiments, "experiment-metrics"
 
 
+# @callback(
+#     Output("run-button-minimise", "n_clicks"),
+#     Output("metrics", "data", allow_duplicate=True),
+#     Output("optimisation-path-fig", "figure"),
+#     Output("optimisation-path-fig-3d", "figure"),
+#     Output("dual-fig", "figure", allow_duplicate=True),
+#     Output("divergence-fig", "figure", allow_duplicate=True),
+#     Output("gradient-fig", "figure", allow_duplicate=True),
+#     Output("loading-metrics", "children", allow_duplicate=True),
+#     Output("experiment-metrics", "className", allow_duplicate=True),
+#     Output("last-min-config", "data", allow_duplicate=True),
+#     Output("save-button-minimise", "disabled"),
+#     Input("run-button-minimise", "n_clicks"),
+#     State("function-mini-input", "value"),
+#     State({"type": "initial-value-input", "index": ALL}, "value"),
+#     State({"type": "initial-value-input-2", "index": ALL}, "value"),
+#     State({"type": "number-iterations-input", "index": ALL}, "value"),
+#     State({"type": "lr-mini-input", "index": ALL}, "value"),
+#     State({"type": "bregman-mini-input", "index": ALL}, "value"),
+#     State("num-experiments-min", "data"),
+#     State({"type": "initial-value-input-2", "index": ALL}, "disabled"),
+#     State("Q-store", "data"),
+#     State({"type": "simplex-initial-value-input", "index": ALL}, "value"),
+#     State({"type": "simplex-initial-value-input-2", "index": ALL}, "value"),
+#     State({"type": "simplex-initial-value-input-3", "index": ALL}, "value"),
+#     State("q1-input", "value"),
+#     State("q2-input", "value"),
+#     State("q3-input", "value"),
+#     State("a-input", "value"),
+#     State("b-input", "value"),
+#     State("optim-x-input", "value"),
+#     State("optim-y-input", "value"),
+#     State("noise-input", "value"),
+#     State("preset-function-input", "value"),
+#     State("loading-metrics", "children"),
+#     State({"type": "Q-input", "index": ALL}, "value"),
+#     prevent_initial_call=True,
+#     allow_duplicate=True,
+#     suppress_callback_exceptions=True,
+# )
+# def combined_experiment_run(n_clicks, objective_string, init_x, init_y, iter, lr, bregman, num_experiments,
+#                             second_input_bool, q_store, p1s, p2s, p3s, q1, q2, q3, a, b, optx, opty,
+#                             noise_std, preset_function, loading_metrics, q_strings):
+#     print("Combined experiment run triggered")
+#     if n_clicks == 0:
+#         # If the run button hasn’t been clicked, do nothing.
+#         return [no_update] * 12
+
+#     # Initialize experiment parameters and starting values.
+#     inits, dim = setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3s)
+#     objective = get_objective_function(preset_function, objective_string, a, b, q1, q2, q3, optx, opty, noise_std=noise_std)
+#     if preset_function != "CUSTOM":
+#         optimum = objective(objective.optimum)
+#         optimum_coords = objective.optimum
+#     else:
+#         optimum, optimum_coords = None, None
+
+#     # Create a dictionary of all experiment configurations.
+#     experiments_dict = create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman,
+#                                                    second_input_bool, q_strings, p1s, p2s, p3s)
+#     experiment_params = {
+#         "inits": inits,
+#         "dim": dim,
+#         "iter": iter,
+#         "optimum": optimum,
+#         "optimum_coords": optimum_coords,
+#         "objective_params": [preset_function, objective_string, a, b, q1, q2, q3, optx, opty, noise_std],
+#         "bregman": bregman,
+#         "learning_rate": lr
+#     }
+    
+#     all_metrics = []      # list to collect metrics from each experiment
+#     metrics_divs = []     # list to collect HTML metrics divs for display
+    
+#     # --- Run the first experiment ---
+#     print("Running experiment 1")
+#     experiment = ExperimentMD(objective,
+#                               bregman=bregman[0],
+#                               Q=torch.tensor(q_store[0][0], dtype=torch.float64),
+#                               Q_inv=torch.tensor(q_store[0][1], dtype=torch.float64),
+#                               x_star=optimum_coords,
+#                               f_star=optimum,
+#                               dim=dim)
+#     experiment.run_experiment_minimise(inits[0], iter[0], float(lr[0]))
+#     metrics_exp = experiment.gather_metrics()
+#     all_metrics.append(metrics_exp)
+#     metrics_divs.append(construct_experiment_results(1, metrics_exp))
+    
+#     # Create initial figures based on the first experiment.
+#     optimisation_path_fig = graph.create_optimisation_path_graph(experiment.minimisation_guesses, experiment.objective, dim)
+#     # For 3D (if applicable) – this uses your custom 3d graph creation.
+#     optimisation_path_fig_3d = graph.create_optimisation_path_3d_graph(experiment.minimisation_guesses, experiment.objective, dim)
+#     gradient_fig = graph.create_gradient_norm_graph(experiment.gradient_logs)
+#     divergence_fig = graph.create_divergence_graph(experiment.avg_divergence_logs)
+#     dual_fig = graph.create_dual_space_trajectory_graph(experiment.optimiser.logs["dual"], experiment.objective, dim)
+
+#     # --- Run experiments 2 to num_experiments in a for loop ---
+#     for exp in range(1, num_experiments):
+#         print(f"Running experiment {exp+1}")
+#         # Use the corresponding index from the parameter lists.
+#         experiment = ExperimentMD(objective,
+#                                   bregman=bregman[exp],
+#                                   Q=torch.tensor(q_store[exp][0], dtype=torch.float64),
+#                                   Q_inv=torch.tensor(q_store[exp][1], dtype=torch.float64),
+#                                   x_star=optimum_coords,
+#                                   f_star=optimum,
+#                                   dim=dim)
+#         experiment.run_experiment_minimise(inits[exp], iter[exp], float(lr[exp]))
+#         # Update all graphs with the new experiment’s data.
+#         optimisation_path_fig, optimisation_path_fig_3d, gradient_fig, divergence_fig, dual_fig = \
+#             graph.update_all_graphs_min(experiment.minimisation_guesses,
+#                                         experiment.gradient_logs,
+#                                         experiment.avg_divergence_logs,
+#                                         experiment.optimiser.logs["dual"],
+#                                         experiment.objective,
+#                                         exp+1,
+#                                         dim=dim)
+#         # Gather and store the metrics.
+#         metrics_exp = experiment.gather_metrics()
+#         all_metrics.append(metrics_exp)
+#         metrics_div = construct_experiment_results(exp+1, metrics_exp)
+#         metrics_divs.append(metrics_div)
+
+#     # Compile the metrics into a dictionary for saving.
+#     metrics_dict = create_compiled_metrics_dicts(num_experiments, all_metrics)
+#     # Arrange final figures into a list (order can be adjusted as needed).
+#     final_figures = [optimisation_path_fig, optimisation_path_fig_3d, dual_fig, divergence_fig, gradient_fig]
+#     # Create the saved experiment state using your helper.
+#     experiment_state = construct_experiment_state(metrics_dict, experiments_dict, experiment_params["objective_params"], final_figures)
+
+   
+#     current_experiment_out = no_update
+
+   
+#     return (0,
+#             all_metrics,
+#             optimisation_path_fig,
+#             optimisation_path_fig_3d,
+#             dual_fig,
+#             divergence_fig,
+#             gradient_fig,
+#             metrics_divs,
+#             "experiment-metrics",
+#             experiment_state,
+#             False)

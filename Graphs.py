@@ -628,12 +628,35 @@ class Graphs():
         return self.optimisation_path_graph3d
 
     def add_optimisation_path_3d(self, minimisation_guesses, objective, exp_number, dim):
-        # add an additional trajectory to the existing 3d optimisation path graph
         if dim == 2:
-            # compute x, y and objective value as z for 2d problems
+            # add the new trajectory to stored trajectories
+            if not hasattr(self, 'trajectories'):
+                self.trajectories = []
+            self.trajectories.append(minimisation_guesses)
+
+            # compute x, y, z for new trajectory
             x_vals = [p[0] for p in minimisation_guesses]
             y_vals = [p[1] for p in minimisation_guesses]
             z_vals = [objective(*torch.tensor([p[0], p[1]], dtype=torch.float32)).item() for p in minimisation_guesses]
+
+            # recompute the global bounds for all trajectories
+            all_points = [pt for traj in self.trajectories for pt in traj]
+            x_all = [pt[0] for pt in all_points]
+            y_all = [pt[1] for pt in all_points]
+            x_min, x_max = min(x_all), max(x_all)
+            y_min, y_max = min(y_all), max(y_all)
+
+            # create a new grid of values
+            x_range = np.linspace(x_min - 5, x_max + 5, 50)
+            y_range = np.linspace(y_min - 5, y_max + 5, 50)
+            X, Y = np.meshgrid(x_range, y_range)
+            Z = np.array([[objective(*torch.tensor([xi, yi], dtype=torch.float32)).item() 
+                            for xi in x_range] for yi in y_range])
+
+            # update the existing surface to account for new trajectory
+            self.optimisation_path_graph3d.data[0].update(x=X, y=Y, z=Z)
+
+            # add the new trajectory 
             self.optimisation_path_graph3d.add_trace(plotly.Scatter3d(
                 x=x_vals,
                 y=y_vals,
@@ -644,7 +667,7 @@ class Graphs():
                 name=f"({exp_number})"
             ))
         elif dim == 3:
-            # for 3d problems, assume minimisation_guesses is a list of 3d points
+            # for 3d (simplex) problems, no surface needs to be updated
             x_vals = [p[0] for p in minimisation_guesses]
             y_vals = [p[1] for p in minimisation_guesses]
             z_vals = [p[2] for p in minimisation_guesses]

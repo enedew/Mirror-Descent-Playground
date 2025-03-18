@@ -10,8 +10,11 @@ import time
 from experiment_utils import setup_inits, get_objective_function, create_compiled_metrics_dicts, create_experiment_dict_min, construct_experiment_results
 import plotly.io as pio 
 from dash.long_callback import DiskcacheManager
-
-app = dash.Dash(__name__, use_pages=True, suppress_callback_exceptions=True)
+import diskcache
+from dash import DiskcacheManager
+cache = diskcache.Cache("./cache")
+background_callback_manager = DiskcacheManager(cache)
+app = dash.Dash(__name__, use_pages=True, suppress_callback_exceptions=True, background_callback_manager=background_callback_manager)
 
 app.index_string = """
 <!DOCTYPE html>
