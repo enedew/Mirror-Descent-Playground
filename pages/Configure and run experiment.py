@@ -11,8 +11,7 @@ import base64
 import numpy as np
 from PresetFuncs import AnisotropicQuadratic, Rastrigin, Rosenbrock, SimplexObjective, Booth, Ackley, CubicObjective, ExponentialObjective2D
 import os
-import sys
-import io
+
 
 dash.register_page(__name__, path="/run-experiment")
 graph = Graphs()
@@ -28,7 +27,7 @@ There are several pre-configured experiments which you can load. Alternatively y
 and upload the configuration to run again.
 """
 
-default_config_path = os.path.join(os.path.dirname(__file__), '../experiment(15).json')
+default_config_path = os.path.join(os.path.dirname(__file__), '../base_experiment.json')
 with open(default_config_path, 'r') as f:
     default_config = json.load(f)
 
@@ -42,6 +41,9 @@ def build_experiment_results_from_saved(saved_state, type):
         if "optim_fig" in figs:
             optim_fig = pio.from_json(figs["optim_fig"])
             graphs.append(optim_fig)
+        if "optim_fig_3d" in figs:
+            optim_fig3d = pio.from_json(figs["optim_fig_3d"])
+            graphs.append(optim_fig3d)
         if "dual_optim_fig" in figs:
             dual_fig = pio.from_json(figs["dual_optim_fig"])
             graphs.append(dual_fig)
@@ -92,7 +94,7 @@ graphs_row1 = html.Div([dcc.Loading(
         delay_show=500,
         overlay_style={"visibility":"visible", "filter": "blur(2px)"},
         children=dcc.Graph(
-            figure=new_experiment_results[0],
+            figure=new_experiment_results[1],
             id="optimisation-path-fig-3d",
             config={'responsive': True},
             className="graph animate-slide-in",
@@ -109,7 +111,7 @@ graphs_row2 = html.Div([
 
         overlay_style={"visibility":"visible", "filter": "blur(2px)"},
         children=dcc.Graph(
-            figure=new_experiment_results[1],
+            figure=new_experiment_results[2],
             id="dual-fig",
             config={'responsive': True},
             className="graph animate-slide-in"
@@ -123,7 +125,7 @@ graphs_row2 = html.Div([
         className="second-row",
         overlay_style={"visibility":"visible", "filter": "blur(2px)"},
         children=dcc.Graph(
-            figure=new_experiment_results[2],
+            figure=new_experiment_results[3],
             id="gradient-fig",
             config={'responsive': True},
             className="graph animate-slide-in"
@@ -138,7 +140,7 @@ graphs_row2 = html.Div([
 
         overlay_style={"visibility":"visible", "filter": "blur(2px)"},
         children=dcc.Graph(
-            figure=new_experiment_results[3],
+            figure=new_experiment_results[4],
             id="divergence-fig",
             config={'responsive': True},
             className="graph animate-slide-in"
@@ -579,7 +581,7 @@ layout = html.Div([
     experiment_dict,
     dcc.Interval(
         id='experiment-interval',
-        interval=1500,  # in milliseconds (1 second interval, adjust as needed)
+        interval=5000,  # in milliseconds (1 second interval, adjust as needed)
         n_intervals=0,
         disabled=True  # Initially disabled
     ),

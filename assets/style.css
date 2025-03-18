@@ -592,7 +592,7 @@ div[id*='"type":"bregman-mini-input"'], #preset-function-input{
     display: grid;
     
     grid-auto-flow: row;
-    gap: 10px;
+    gap: 5px;
     margin-top: 0.5vh;
     margin-right: 0.5vw;
 }
@@ -604,10 +604,11 @@ div[id*='"type":"bregman-mini-input"'], #preset-function-input{
 .first-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    gap: 5px;
 }
 .second-row {
     display: grid;
-
+    gap: 5px;
     grid-template-columns: 1fr 1fr 1fr;
 }
 

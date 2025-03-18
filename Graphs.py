@@ -95,7 +95,7 @@ class Graphs():
             plot_bgcolor="#f2e9dd",
             paper_bgcolor="#f2e9dd",
             legend = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=5, r=10, t=20, b=5)
+            margin=dict(l=5, r=10, t=80, b=5)
 
         )
         self.gradient_norm_graph.update_xaxes(
@@ -150,6 +150,7 @@ class Graphs():
             plot_bgcolor="#f2e9dd",
             paper_bgcolor="#f2e9dd",
             legend = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            margin=dict(l=5, r=10, t=80, b=5)
 
         )
         self.divergence_graph.update_xaxes(
@@ -304,13 +305,14 @@ class Graphs():
                 
             ))
             self.optimisation_path_graph.update_layout(
-                title = 'primal space optimisation trajectory',
+                title = 'Primal Space Optimisation Trajectory (Contour)',
                 xaxis_title = 'x',
                 yaxis_title = 'f(x)',
                 font = dict(family="roboto", color="black"),
                 legend = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 plot_bgcolor = "#f2e9dd",
-                paper_bgcolor = "#f2e9dd"
+                paper_bgcolor = "#f2e9dd",
+                margin=dict(l=5, r=10, t=80, b=5)
             )
         
         elif dim == 2:
@@ -362,14 +364,15 @@ class Graphs():
                 name = "(1)",
             ))
             self.optimisation_path_graph.update_layout(
-                title = 'primal space optimisation trajectory',
+                title = 'Primal Space Optimisation Trajectory (Contour)',
                 xaxis_title = 'x',
                 yaxis_title = 'y',
                 template = "plotly_white",
                 font = dict(family="roboto", color="black"),
                 legend = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 plot_bgcolor = "#f2e9dd",
-                paper_bgcolor = "#f2e9dd"
+                paper_bgcolor = "#f2e9dd",
+                margin=dict(l=5, r=10, t=80, b=5)
             )
         
         elif dim == 3:
@@ -470,7 +473,7 @@ class Graphs():
                     font = dict(color="black", size=12)
                 ))
             self.optimisation_path_graph.update_layout(
-                title = 'primal space optimisation trajectory',
+                title = 'Primal Space Optimisation Trajectory (Contour)',
                 xaxis_title = '',
                 yaxis_title = '',
                 template = "plotly_white",
@@ -478,7 +481,8 @@ class Graphs():
                 legend = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 plot_bgcolor = "#f2e9dd",
                 paper_bgcolor = "#f2e9dd",
-                annotations = annotations
+                annotations = annotations,
+                margin=dict(l=5, r=10, t=80, b=5)
             )
             self.optimisation_path_graph.update_xaxes(
                 gridcolor = "#e8dac5",
@@ -580,7 +584,7 @@ class Graphs():
                 name="(1)"
             ))
             self.optimisation_path_graph3d.update_layout(
-                title='primal space optimisation trajectory (3d)',
+                title='Primal Space Optimisation Trajectory (3D)',
                 scene=dict(
                     xaxis_title='x',
                     yaxis_title='y',
@@ -589,7 +593,8 @@ class Graphs():
                 font=dict(family="roboto", color="black"),
                 legend = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 plot_bgcolor="#f2e9dd",
-                paper_bgcolor="#f2e9dd"
+                paper_bgcolor="#f2e9dd",
+                margin=dict(l=5, r=10, t=80, b=5)
             )
         elif dim == 3:
             # for 3d problems, assume minimisation_guesses is a list of 3d points
@@ -607,7 +612,7 @@ class Graphs():
                 name="(1)"
             ))
             self.optimisation_path_graph3d.update_layout(
-                title='primal space optimisation trajectory (3d)',
+                title='Primal Space Optimisation Trajectory (3D)',
                 scene=dict(
                     xaxis_title='p1',
                     yaxis_title='p2',
@@ -617,6 +622,7 @@ class Graphs():
                 plot_bgcolor="#f2e9dd",
                 paper_bgcolor="#f2e9dd",
                 legend = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                margin=dict(l=5, r=10, t=80, b=5)
 
             )
         return self.optimisation_path_graph3d
@@ -719,7 +725,8 @@ class Graphs():
             font=dict(family="roboto", color="black"),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             plot_bgcolor="#f2e9dd",
-            paper_bgcolor="#f2e9dd"
+            paper_bgcolor="#f2e9dd",
+            margin=dict(l=5, r=10, t=80, b=5)
         )
         self.dual_space_graph.update_xaxes(
             gridcolor="#e8dac5",
