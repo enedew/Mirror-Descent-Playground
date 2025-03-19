@@ -382,7 +382,10 @@ class ExperimentMD():
         x = torch.tensor(init, requires_grad=True, dtype=torch.float64)
 
         self.construct_optimiser([x], lr)
-
+        # if self.optimiser.logs is not None:
+        #     initial_dual = self.optimiser.grad_psi(x.data)
+        #     self.optimiser.logs['primal'].append(x.data.numpy())
+        #     self.optimiser.logs['dual'].append(initial_dual.numpy())
         overall_start_time = time.time()
 
         print("Optimiser constructed, now starting minimisation")

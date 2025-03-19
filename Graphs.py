@@ -545,7 +545,7 @@ class Graphs():
                 hovertemplate="%{hovertext}"
             ))
             # update the contour plot for the simplex if needed
-            # you might want to call your update_contour function here if it supports dim==3
+            
         return self.optimisation_path_graph
 
     def create_optimisation_path_3d_graph(self, minimisation_guesses, objective, dim):
@@ -556,10 +556,10 @@ class Graphs():
             y_vals = [p[1] for p in minimisation_guesses]
             z_vals = [objective(*torch.tensor([p[0], p[1]], dtype=torch.float32)).item() for p in minimisation_guesses]
             # create grid for the objective surface
-            x_min, x_max = min(x_vals), max(x_vals)
-            y_min, y_max = min(y_vals), max(y_vals)
-            x_range = np.linspace(x_min - 5, x_max + 5, 50)
-            y_range = np.linspace(y_min - 5, y_max + 5, 50)
+            
+            x_bounds, y_bounds = self.compute_dynamic_range(self.trajectories, padding_ratio=0.2)
+            x_range = np.linspace(x_bounds[0], x_bounds[1], 200)
+            y_range = np.linspace(y_bounds[0], y_bounds[1], 200)
             X, Y = np.meshgrid(x_range, y_range)
             Z = np.array([
                 [objective(*torch.tensor([xi, yi], dtype=torch.float32)).item() for xi, yi in zip(x_row, y_row)]
@@ -594,7 +594,11 @@ class Graphs():
                 legend = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 plot_bgcolor="#f2e9dd",
                 paper_bgcolor="#f2e9dd",
-                margin=dict(l=5, r=10, t=80, b=5)
+                margin=dict(l=5, r=10, t=80, b=5),
+                transition={
+                    'duration': 500,
+                    'easing': 'cubic-in-out'
+                }
             )
         elif dim == 3:
             # for 3d problems, assume minimisation_guesses is a list of 3d points
@@ -622,7 +626,11 @@ class Graphs():
                 plot_bgcolor="#f2e9dd",
                 paper_bgcolor="#f2e9dd",
                 legend = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                margin=dict(l=5, r=10, t=80, b=5)
+                margin=dict(l=5, r=10, t=80, b=5),
+                transition={
+                    'duration': 500,
+                    'easing': 'cubic-in-out'
+                }
 
             )
         return self.optimisation_path_graph3d
@@ -647,8 +655,9 @@ class Graphs():
             y_min, y_max = min(y_all), max(y_all)
 
             # create a new grid of values
-            x_range = np.linspace(x_min - 5, x_max + 5, 50)
-            y_range = np.linspace(y_min - 5, y_max + 5, 50)
+            x_bounds, y_bounds = self.compute_dynamic_range(self.trajectories, padding_ratio=0.2)
+            x_range = np.linspace(x_bounds[0], x_bounds[1], 200)
+            y_range = np.linspace(y_bounds[0], y_bounds[1], 200)
             X, Y = np.meshgrid(x_range, y_range)
             Z = np.array([[objective(*torch.tensor([xi, yi], dtype=torch.float32)).item() 
                             for xi in x_range] for yi in y_range])

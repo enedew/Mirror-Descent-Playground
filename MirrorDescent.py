@@ -85,18 +85,20 @@ class MirrorDescent(Optimizer):
                 # compute mirror map of param
                 y0 = self.grad_psi(param.data) 
 
+                # log values before step
+                if self.logs is not None:
+                    primal_val = param.data.clone().detach()
+                    dual_val = y0
+                    self.logs['primal'].append(primal_val.numpy())
+                    self.logs['dual'].append(dual_val.numpy())
+
                 #update in dual space 
                 y1 = y0 - (lr * grad)
 
                 # map back to primal space and update parameter value 
                 param.data = self.inv_grad_psi(y1) 
                 
-                # log values if required
-                if self.logs is not None:
-                    primal_val = param.data.clone().detach()
-                    dual_val = y1
-                    self.logs['primal'].append(primal_val.numpy())
-                    self.logs['dual'].append(dual_val.numpy())
+                
                     
 
                  
