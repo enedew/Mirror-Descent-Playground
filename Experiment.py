@@ -32,11 +32,10 @@ class ExperimentMD():
         self.dgfs = {
             'EUCLID' : lambda x: 0.5 * torch.sum(x**2),
             # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
-            'KL' : lambda x: torch.sum((x+1e-8) * torch.log(x +1e-8)),
+            'KL' : lambda x: torch.sum((x+1e-8) * torch.log(x +1e-8) - (x + 1e-8)),
             'MAHALANOBIS': lambda x: 0.5 * torch.sum(x * (self.Q @ x)),
             'ITAKURA-SAITO': lambda x: -torch.sum(torch.log(x + 1e-8)),
-            'POWER3'         : lambda x: (1/3) * torch.sum(torch.abs(x)**3),
-            'EXPONENTIAL'    : lambda x: torch.sum(torch.exp(x) - 1)
+
         }
         # approximation logs
         self.metrics = []
@@ -80,7 +79,7 @@ class ExperimentMD():
         self.total_run_time = None
 
 
-    def gather_metrics(self, grad_threshold = 1e-4,step_ratio_threshold = 1e-15,
+    def gather_metrics(self, grad_threshold = 1e-3,step_ratio_threshold = 1e-15,
                        breg_ratio_threshold = 1e-15,dual_step_ratio_threshold = 1e-15):
         
         # ratio threshold params are to prevent division by 0 if the step size is extremely small
@@ -182,7 +181,7 @@ class ExperimentMD():
 
         # this section calculates statistics for steps in the dual space,
         # just uses the euclidean norm rather than the specific bregmans, as these values should already 
-        # exist in the bregman-specific geometry induced from the different mirror maps 
+        # exist in the bregman-specific geometry from the different mirror maps 
         dual_logs = None
         if hasattr(self, 'optimiser') and hasattr(self.optimiser, 'logs'):
             dual_logs = self.optimiser.logs.get('dual', None)
@@ -264,111 +263,12 @@ class ExperimentMD():
 
         return metrics
 
-    def build_simple_MLP(self, layers, neurons=10):
-        # function to construct a simple MLP, taking in neurons and layers parameters
-        # (TO DO: layers)
-        self.model = torch.nn.Sequential(
-            torch.nn.Linear(1,neurons),
-            torch.nn.ReLU(),
-            torch.nn.Linear(neurons,1)
-        )
-
+    
     def construct_optimiser(self, params, lr):
         # function to construct the optimiser from the mirror descent class
         print(self.Q)
         self.optimiser = MirrorDescent(params, lr, self.bregman, self.Q, self.Q_inv, logs=True)
 
-
-    def generate_data(self, lbound, ubound, n_samples):
-        # function to generate synthetic training data for function approximation
-        X = np.linspace(lbound, ubound, n_samples).astype(np.float32) 
-        Y = self.objective(torch.tensor(X)) 
-        X = torch.tensor(X).unsqueeze(1)
-        Y = torch.tensor(Y).unsqueeze(1) 
-        return X, Y 
-
-
-    def train_model(self, X, Y, batch_size, epochs=2000):
-        # function for training the constructed model
-        samples = X.shape[0]
-        for epoch in range(epochs):
-            # shuffle indices for random mini-batches
-            shuffled_idxs = torch.randperm(samples)
-            for i in range(0, samples, batch_size):
-                # prepare the mini-batch
-                batch_idxs = shuffled_idxs[i : i+batch_size]
-                X_batch = X[batch_idxs]
-                Y_batch = Y[batch_idxs]
-
-                pred = self.model(X_batch)
-                loss = self.criterion(pred, Y_batch)
-
-                self.optimiser.zero_grad()
-                loss.backward()
-                
-                # record gradient norms 
-                self.calculate_record_gradient_norms()
-
-                
-                # save original parameters before stepping for bregman calculation
-                old_params = []
-                for group in self.optimiser.param_groups:
-                    for param in group['params']:
-                        old_params.append(param.data.clone())
-
-                # kept getting NaN params and predictions, implementing this stopped it but still getting
-                # the error for KL.
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=5.0)
-
-                self.optimiser.step()
-
-                for param in self.model.parameters():
-                    if torch.isnan(param).any():
-                        print("WARNING: NaN detected in parameter")
-
-                
-                self.calculate_record_average_bregman_divergence(old_params, self.bregman)
-                
-
-            # calculate metrics 
-            if epoch % (epochs / 10) == 0:
-                if not torch.isnan(pred).any():
-                    pred = self.model(X)
-                    metrics = self.calculate_metrics(Y, pred)
-                    self.metrics.append([epoch] + metrics)
-                    print(f"Epoch: {epoch}, Loss: {loss.item()}")
-
-                else:
-                    print("WARNING: NaN prediction values present")
-            self.loss_logs.append(loss.item())
-
-    def calculate_metrics(self, true, pred):
-        # function to calculate either regression or classification metrics
-        # (Classification models still need to be implemented) - currently just MLP regressor
-        true = true.detach().cpu().numpy()
-        pred = pred.detach().cpu().numpy()
-        if self.results == 'R':
-            metric_functions = [mean_absolute_error, r2_score]
-        elif self.results == 'C':
-            metric_functions = [accuracy_score, precision_score, recall_score, f1_score]
-        metrics = [calculate_metric(true, pred) for calculate_metric in metric_functions]
-        
-
-        return metrics
-        
-    def predict(self, X, Y):
-        # get the model to predict on a dataset
-        preds_final = self.model(X)
-        loss_final = self.criterion(preds_final, Y)
-        final_metrics = self.calculate_metrics(preds_final, Y) 
-        self.metrics.append(['T'] + final_metrics)
-        self.loss_logs.append(loss_final.item())
-
-        self.prediction_data = {
-            'X': X.detach().cpu().numpy().flatten(),
-            'Y_true': Y.detach().cpu().numpy().flatten(),
-            'Y_pred': preds_final.detach().cpu().numpy().flatten()
-        }
 
     def run_experiment_minimise(self, init, iter, lr):
         # minimises an objective function using the MirrorDescent optimiser
@@ -382,10 +282,7 @@ class ExperimentMD():
         x = torch.tensor(init, requires_grad=True, dtype=torch.float64)
 
         self.construct_optimiser([x], lr)
-        # if self.optimiser.logs is not None:
-        #     initial_dual = self.optimiser.grad_psi(x.data)
-        #     self.optimiser.logs['primal'].append(x.data.numpy())
-        #     self.optimiser.logs['dual'].append(initial_dual.numpy())
+       
         overall_start_time = time.time()
 
         print("Optimiser constructed, now starting minimisation")
@@ -411,6 +308,7 @@ class ExperimentMD():
             
             # record the gap between current objective value and minimum objective value (if known)
             if self.f_star is not None:
+                
                 gap = f_val - self.f_star
                 self.gap_logs.append(gap)
             else:
@@ -425,10 +323,8 @@ class ExperimentMD():
             self.optimiser.step()
 
 
-            # ensures the first input is always normalised for KL mirror map or the simplex preset problem
-            # KL mirror map preserves normalisation without this step but this can go awry if initial input isnt normalised
-            # other mirror maps need to be projected back onto the simplex through normalisation at every step
-            if self.bregman == "KL" or simplex:
+            # normalises the probabilties after step is performed if the obejctive is the simplex objective
+            if simplex:
                 x.data = x.data / x.data.sum()
             #recording the iteration run time
             iter_elapsed = time.time() - iter_start_time
@@ -494,23 +390,6 @@ class ExperimentMD():
         self.avg_divergence_logs.append(avg_divergence)
 
 
-    def run_experiment_mlp(self, data_lbound, data_ubound, n_samples, batch_size, layers, neurons, epochs, lr):
-        # function runs an experiment to approximate a given input function using a simple multi layer perceptron with MirrorDescent as the optimiser
-        # generate the data
-        # this should vary on the bregman, for now just built for euclidean 
-        X, Y = self.generate_data(data_lbound, data_ubound, n_samples)
-        print("data generated")
-        # construct the model, basic MLP right now, adding different options later down the line
-        self.build_simple_MLP(layers, neurons)
-        print("model constructed")
-        # construct optimiser using MirrorDescent class
-        self.construct_optimiser(self.model.parameters(), lr)
-        print("optimiser constructed")
-        # train the model 
-        self.train_model(X, Y, batch_size, epochs)
-        print("training complete")
-        # final predict 
-        self.predict(X, Y)
 
 
 

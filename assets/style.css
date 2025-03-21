@@ -61,13 +61,25 @@ p {
     margin: 3vh auto auto auto;
     width: 85%;
     border-radius: 3px;
-
     color: var(--ds);
-    
+}
+
+.maps-desc {
+    font-family: "Roboto", serif;
+    background-color: var(--da);
+    font-optical-sizing: auto;
+    font-weight: 400;
+    margin: 3vh auto 3vh auto;
+    padding-top: 3px;
+    width: 85%;
+    text-align: center;
+    border-radius: 3px;
+    color: var(--ds);
 }
 
 .padding-markdown {
-    padding: 0 0 0.3vh 1vw;
+    padding: 0 0.5vw 0.5vw 1vh;
+    text-align: left;
 }
 
 .bregman-visual {
@@ -78,6 +90,14 @@ p {
     margin: 3vh auto 3vh auto;
     box-sizing: border-box;
     
+}
+
+h4 {
+    text-decoration: underline;
+}
+
+mjx-container {
+    font-size: 1.1em;
 }
 
 .bregman-desc {
@@ -96,7 +116,7 @@ p {
 }
 .experiment-page-toprow {
     display: grid;
-    grid-template-columns: 1.2fr 1fr;
+    grid-template-columns: 0.6fr 1fr;
     grid-template-rows: auto
 }
 
@@ -130,7 +150,7 @@ p {
 .preset-load{ 
     display: flex;
     flex-direction: row;
-    justify-content: space-evenly;
+    justify-content: space-around;
     align-items: center;
     border-right: 2px solid var(--ds);
 }
@@ -139,6 +159,11 @@ p {
     display: flex;
     flex-direction: row;
     justify-content: space-evenly;
+    margin-bottom: 0.5vh;
+}
+
+#preset-dropdown {
+    width: 7vw;
 }
 
 .upload {
@@ -176,7 +201,7 @@ p {
 }
 
 #preset-dropdown {
-    width: 7vw;
+    width: 9vw;
 }
 
 .bregman-graph-interactive {
@@ -391,11 +416,20 @@ h3, .graph-header {
     cursor: pointer;
 }
 
-.save-button:disabled, .add-button:disabled, .run-button:disabled{
+.disabled {
     background-color: #b4b1be
 }
 
-.save-button:disabled:hover, .add-button:disabled:hover, .run-button:disabled:hover{
+.disabled:hover {
+    background-color: #b4b1be;
+    cursor: default;
+}
+
+.save-button:disabled, .add-button:disabled, .run-button:disabled , .fig-button:disabled{
+    background-color: #b4b1be
+}
+
+.save-button:disabled:hover, .add-button:disabled:hover, .run-button:disabled:hover, .fig-button:disabled:hover{
     background-color: #b4b1be;
     cursor: default;
 }

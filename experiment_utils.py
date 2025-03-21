@@ -1,6 +1,6 @@
 from dash import html
 from FunctionParser import FunctionParser
-from PresetFuncs import AnisotropicQuadratic, SimplexObjective, CubicObjective, Rosenbrock, Rastrigin, Booth, Ackley, ExponentialObjective2D
+from PresetFuncs import AnisotropicQuadratic, SimplexObjective, ItakuraObjective, CubicObjective, Rosenbrock, Rastrigin, Booth, Ackley, ExponentialObjective2D
 import torch
 
 def construct_experiment_results(idx, metrics_dict):
@@ -41,6 +41,7 @@ def construct_experiment_results(idx, metrics_dict):
     className="experiment-result",
     id={"type": "experiment-result", "index": idx})
 
+# sets up the intial values depending on the function preset and subsequent dimension
 def setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3s):
     if preset_function == "CUSTOM":
             if second_input_bool[0]==False:
@@ -83,47 +84,8 @@ def get_objective_function(preset_value, objective_string, a, b, q1, q2, q3, opt
             "EXPONENTIAL": lambda: CubicObjective(optimum = torch.tensor([optx, opty]), noise_std=noise_std)
         }
         return presets[preset_value]()
-    
 
-def construct_experiment_results(idx, metrics_dict):
-       # function converts the metrics_dict into a table
-    table_rows = []
-    for key, value in metrics_dict.items():
-        
-        if isinstance(value, list):
-            # skip arrays like step_sizes
-            continue
-        elif isinstance(value, float):
-            if abs(value) > 1e6:
-                display_value = f"{value:.3e}"
-            else:
-                display_value = f"{value:.5f}"
-            row_value = str(display_value)
-        else:
-            row_value = str(value)
-        table_rows.append(
-            html.Tr(
-                [
-                    html.Td(key, className="metric-name"),
-                    html.Td(row_value, className="metric-value")
-                ],
-                id={'type': 'metric-row', 'metric': key, 'table': idx},
-                n_clicks=0,
-                style={'cursor': 'pointer'}  # visually indicate that the row is clickable
-            )
-        )
-
-    return html.Div([
-        html.H4(f"Experiment {idx} results", className="experiment-header"),
-        html.Table(
-            className="metrics-table",
-            children=[html.Tbody(table_rows)]
-        )
-    ],
-    className="experiment-result",
-    id={"type": "experiment-result", "index": idx})
-
-
+# creates dictionary containing the params for each individual experiment con figuration
 def create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool, qs, p1s, p2s, p3s):
     experiments_dict = {}
     for i in range(num_experiments):
@@ -231,8 +193,9 @@ def get_objective_function(preset_value, objective_string, a, b, q1, q2, q3, opt
             "RASTRIGIN": lambda: Rastrigin(noise_std=noise_std),
             "BOOTH": lambda: Booth(noise_std=noise_std),
             "ACKLEY": lambda: Ackley(noise_std=noise_std),
-            "CUBIC": lambda: ExponentialObjective2D(optimum = torch.tensor([optx, opty]), noise_std=noise_std),
-            "EXPONENTIAL": lambda: CubicObjective(optimum = torch.tensor([optx, opty]), noise_std=noise_std)
+            "CUBIC": lambda: CubicObjective(optimum = torch.tensor([optx, opty]), noise_std=noise_std),
+            "EXPONENTIAL": lambda: ExponentialObjective2D(optimum = torch.tensor([optx, opty]), noise_std=noise_std),
+            "ITAKURA": lambda: ItakuraObjective(a=float(a), noise_std=noise_std)
         }
         return presets[preset_value]()
     

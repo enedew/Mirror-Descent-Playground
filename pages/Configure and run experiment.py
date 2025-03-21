@@ -14,26 +14,52 @@ from experiment_utils import (add_highlight, get_corresponding_value, setup_init
                                create_experiment_dict_min, get_objective_function, remove_highlights, clone_fig_shallow)
 import os
 import time
-
+import re
+import plotly.io as pio 
 dash.register_page(__name__, path="/run-experiment")
 graph = Graphs()
 explanation_md = r"""
 Here you can configure and run your own experiments with the mirror descent algorithm.
-There are two different types of experiments available: 
-* Minimising an objective function using mirror descent.
-* Approximating a function with a simple regression model, using mirror descent to minimise the loss over training. 
+You can input your own custom function, 1D or 2D, or choose from the selection preset functions, which allow for some customisation in terms of curvature or where the optimum lies. 
+
 """
 
 loading_md = r"""
-There are several pre-configured experiments which you can load. Alternatively you have the option to save experiments after running,
+There are several pre-configured experiments which you can load, each of which shows a scenario in which the corresponding mirror map is inherently suited to. Alternatively you have the option to save experiments after running,
 and upload the configuration to run again.
 """
 
-default_config_path = os.path.join(os.path.dirname(__file__), '../base_experiment.json')
+# default configurations to load in
+
+default_config_path = os.path.join(os.path.dirname(__file__), '../experiments/base_experiment.json')
 with open(default_config_path, 'r') as f:
     default_config = json.load(f)
 
-import plotly.io as pio 
+euclidean_config_path = os.path.join(os.path.dirname(__file__), '../experiments/euclidean_experiment.json')
+with open(euclidean_config_path, 'r') as f:
+    euclidean_config = json.load(f)
+
+mahalanobis_config_path = os.path.join(os.path.dirname(__file__), "../experiments/mahalanobis_experiment.json")
+with open(mahalanobis_config_path, 'r') as f:
+    mahalanobis_config = json.load(f)
+
+kl_config_path = os.path.join(os.path.dirname(__file__), '../experiments/kl_experiment.json')
+with open(kl_config_path, 'r') as f:
+    kl_config = json.load(f)
+
+itakura_config_path = os.path.join(os.path.dirname(__file__), '../experiments/itakura_experiment.json')
+with open(itakura_config_path, 'r') as f:
+    itakura_config = json.load(f)
+
+
+config_dict = {
+    "EUCLID": euclidean_config,
+    "KL": kl_config,
+    "MAHALANOBIS": mahalanobis_config,
+    "ITAKURA-SAITO": itakura_config
+}
+
+
 def build_experiment_results_from_saved(saved_state, type):
     
     figs = saved_state.get("figures", {})
@@ -71,6 +97,236 @@ def build_experiment_results_from_saved(saved_state, type):
         
     return graphs
 
+
+
+
+displaying_point_values_div = html.Div([
+    dcc.Markdown(children="Figures to display: ", id="logging-markdown", className="logging-markdown"),
+    html.Button("Trajectory (3D)", className="fig-button clicked", id="optim-3d-button"),
+    html.Button("Trajectory (2D / 1D)", className="fig-button clicked", id="optim-contour-button"),
+    html.Button("Bregman Divergence", className="fig-button clicked", id="div-button"),
+    html.Button("Gradient Norm", className="fig-button clicked", id="grad-button"),
+    html.Button("Trajectory (Dual Space)", className="fig-button clicked", id="dual-button"),
+
+],id="hovered-values", className="log-container")
+
+
+
+# CONSTRUCTOR FUNCTIONS 
+# -------------------------------------------
+def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01, p1=0.2, p2=0.3, p3=0.5, Q="2, 0, 0, 1", bregman="EUCLID"):
+    # builds a number of input containers for an experiment configuration
+    return html.Div([
+        dcc.Markdown(f"**Algorithm parameters ({idx})**"),
+        html.Div([
+            html.Label("Initial value (X)"),
+            dcc.Input(type="number", value=init_x, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "initial-value-input", "index": idx}),
+        ], className="input-row", id={"type": "init-row", "index": idx}),
+        html.Div([
+            html.Label("Initial value (Y)"),
+            dcc.Input(type="number", value=init_y, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "initial-value-input-2", "index": idx}),
+        ], className="input-row", id={"type": "init-row-2", "index": idx}),
+        html.Div([
+            html.Label("Initial value (p1)"),
+            dcc.Input(type="number", value=p1, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "simplex-initial-value-input", "index": idx}),
+        ], className="input-row hidden", id={"type": "simplex-init-row", "index": idx}),
+        html.Div([
+            html.Label("Initial value (p2)"),
+            dcc.Input(type="number", value=p2, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "simplex-initial-value-input-2", "index": idx}),
+        ], className="input-row hidden", id={"type": "simplex-init-row-2", "index": idx}),
+        html.Div([
+            html.Label("Initial value (p3)"),
+            dcc.Input(type="number", value=p3, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "simplex-initial-value-input-3", "index": idx}),
+        ], className="input-row hidden", id={"type": "simplex-init-row-3", "index": idx}),
+        html.Div([
+            html.Label("Iterations"),
+            dcc.Input(type="number", value=iterations, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "number-iterations-input", "index": idx}),
+        ], className="input-row"),
+        html.Div([
+            html.Label("Learning Rate"),
+            dcc.Input(type="number", value=lr, step=0.001, min=0, style={"marginBottom": "5px"},
+                      className="input-values", id={"type": "lr-mini-input", "index": idx}),
+        ], className="input-row"),
+        html.Div([
+            html.Label("Bregman"),
+            dcc.Dropdown(
+                options=[
+                    {"label": "Euclidean", "value": "EUCLID"},
+                    {"label": "KL", "value": "KL"},
+                    {"label": "Mahalanobis", "value": "MAHALANOBIS"},
+                    {"label": "Itakura-Saito", "value": "ITAKURA-SAITO"}
+                ],
+                value=bregman,
+                id={"type": "bregman-mini-input", "index": idx},
+                className="dropdown"
+            )
+        ], className="input-row"),
+        html.Div([
+            html.Label("Positive Definite Matrix"),
+            dcc.Input(type="text", value=Q, step=0.001, min=0, style={"marginBottom": "5px"},
+                      className="input-function", id={"type": "Q-input", "index": idx}),
+        ], className="input-row hidden", id={"type": "Q-input-row", "index": idx})
+    ], className="settings", id={"type": "minimise-settings", "index": idx})
+
+# constructs metrics tables from the metrics dict returned from experiment.gather_metrics()
+def construct_experiment_results(idx, metrics_dict):
+    table_rows = []
+    for key, value in metrics_dict.items():
+        
+        if isinstance(value, list):
+            # skip arrays like step_sizes
+            continue
+        elif isinstance(value, float):
+            if abs(value) > 1e6:
+                display_value = f"{value:.3e}"
+            else:
+                display_value = f"{value:.5f}"
+            row_value = str(display_value)
+        else:
+            row_value = str(value)
+        table_rows.append(
+            html.Tr(
+                [
+                    html.Td(key, className="metric-name"),
+                    html.Td(row_value, className="metric-value")
+                ],
+                id={'type': 'metric-row', 'metric': key, 'table': idx},
+                n_clicks=0,
+                style={'cursor': 'pointer'}  # visually indicate that the row is clickable
+            )
+        )
+
+    return html.Div([
+        html.H4(f"Experiment {idx} results", className="experiment-header"),
+        html.Table(
+            className="metrics-table",
+            children=[html.Tbody(table_rows)]
+        )
+    ],
+    className="experiment-result animate-slide-in",
+    id={"type": "experiment-result", "index": idx})
+
+
+
+
+# builds the necessary number of configurations and each inputs value from a saved experiment
+def build_minimise_config_from_saved(saved_state):
+    experiments = saved_state.get("experiments", {})
+    metrics = saved_state.get("metrics", {})
+    metric_configs = []
+    experiment_configs = []
+    for i in range(len(experiments)):
+        exp = experiments.get(f"experiment-{i+1}")
+        config =  construct_mini_settings(i+1,exp.get("initial_value_x"),exp.get("initial_value_y"),exp.get("iterations"),exp.get("learning_rate"),exp.get("p1"),exp.get("p2"),exp.get("p3"),exp.get("Q"),exp.get("bregman"))
+        if i == 0:
+            experiment_configs.append(config)
+        else:
+            experiment_configs.append(html.Div(config, id=f"new-settings-{i+1}", className="option-columns-mlp"))
+        
+    for i in range(len(experiments)):
+        metric = metrics.get(f"experiment-{i+1}-metrics", {})
+        metric_configs.append(construct_experiment_results(i+1, metric))
+    minimise_config = html.Div([html.Div([
+    dcc.Markdown("**Objective function and algorithm parameters**"),
+    html.Div([
+        html.Label("Objective Function"),
+        dcc.Input(type="text", value=saved_state["configuration"].get("function", ""), style={"marginBottom": "5px"}, className="input-function", id="function-mini-input"),
+    ], className="input-row"),
+    html.Div([
+        html.Label("Function Presets"),
+        dcc.Dropdown(
+            options=[
+                {"label": "Custom", "value": "CUSTOM"},
+                {"label": "Anisotropic", "value": "ANISO"},
+                {"label": "Cubic", "value": "CUBIC"},
+                {"label": "3D Simplex", "value": "SIMPLEX"},
+                {"label": "Itakura-based", "value": "ITAKURA"},
+                {"label": "Rosenbrock", "value": "ROSENBROCK"},
+                {"label": "Rastrigin", "value": "RASTRIGIN"},
+                {"label": "Booth", "value": "BOOTH"},
+                {"label": "Ackley", "value": "ACKLEY"},
+                {"label": "Exponential", "value": "EXPONENTIAL"},
+            ]   
+        , id="preset-function-input",className="dropdown", value=saved_state["configuration"].get("function_preset", ""))
+    ], className = "input-row"),
+    html.Div([
+        html.Label("Variable (a)"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("var_a"), style={"marginBottom": "5px"}, className="input-values", id="a-input")
+    ], className="input-row hidden", id="a-input-row"),
+    html.Div([
+        html.Label("Variable (B)"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("var_b"), style={"marginBottom": "5px"}, className="input-values", id="b-input")
+    ], className="input-row hidden", id="b-input-row"),
+    html.Div([
+        html.Label("Optimum (x)"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("opt_x"), style={"marginBottom": "5px"}, className="input-values", id="optim-x-input")
+    ], className="input-row hidden", id="optim-x-input-row"),
+    html.Div([
+        html.Label("Optimum (y)"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("opt_y"), style={"marginBottom": "5px"}, className="input-values", id="optim-y-input")
+    ], className="input-row hidden", id="optim-y-input-row"),
+    html.Div([
+        html.Label("Noise"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("noise"), max=50, min=0, step=0.1, style={"marginBottom": "5px"}, className="input-values", id="noise-input")
+    ], className="input-row hidden", id="noise-input-row"),
+    html.Div([
+        html.Label("Target q1"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("q1"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q1-input")
+    ], className="input-row hidden", id="q1-input-row"),
+    html.Div([
+        html.Label("Target q2"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("q2"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q2-input")
+    ], className="input-row hidden", id="q2-input-row"),
+    html.Div([
+        html.Label("Target q3"),
+        dcc.Input(type="number", value=saved_state["configuration"].get("q3"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q3-input")
+    ], className="input-row hidden", id="q3-input-row"),
+    experiment_configs[0]]
+    , className= "settings", id="inner-div")], id="minimise-config", className="option-columns-mlp")
+    full_config = [minimise_config] + experiment_configs[1:]
+    return full_config, metric_configs
+
+
+# constructs the dictionary for an experiment configuration(s), for saving to a json
+def construct_experiment_state(metrics_dict, experiment_config_dict, experiment_params, figures):
+    experiment_state = {
+            "configuration": {
+                "experiment_type": "minimise",  
+                "function": experiment_params[1], 
+                "function_preset": experiment_params[0],
+                "var_a": experiment_params[2],
+                "var_b": experiment_params[3],
+                "opt_x": experiment_params[7],
+                "opt_y": experiment_params[8],
+                "noise": experiment_params[9],
+                "q1": experiment_params[4],
+                "q2": experiment_params[5],
+                "q3": experiment_params[6]     
+            },
+            "experiments": experiment_config_dict,
+            "metrics": metrics_dict,
+            "figures": {
+                "optim_fig": pio.to_json(figures[0]),
+                "optim_fig_3d": pio.to_json(figures[1]),
+                "dual_optim_fig": pio.to_json(figures[2]),
+                "gradient_fig": pio.to_json(figures[3]),
+                "divergence_fig": pio.to_json(figures[4]),
+            }
+    }
+    return experiment_state
+
+
+
+# LAYOUT AND COMPONENTS 
+# -----------------------------------
+
+# constructs the figures from the default configuration to be shown when first loading the experiment page
 new_experiment_results = build_experiment_results_from_saved(default_config, "minimise")
 
 graphs_row1 = html.Div([
@@ -133,7 +389,7 @@ graphs_row2 = html.Div([
             className="second-row",
             overlay_style={"visibility":"visible", "filter": "blur(2px)"},
             children=dcc.Graph(
-                figure=new_experiment_results[4],
+                figure=new_experiment_results[3],
                 id="gradient-fig",
                 config={'responsive': True},
                 className="graph animate-slide-in"
@@ -150,7 +406,7 @@ graphs_row2 = html.Div([
             overlay_style={"visibility":"visible", "filter": "blur(2px)"},
             children=[
                 dcc.Graph(
-                figure=new_experiment_results[3],
+                figure=new_experiment_results[4],
                 id="divergence-fig",
                 config={'responsive': True},
                 className="graph animate-slide-in"
@@ -159,83 +415,7 @@ graphs_row2 = html.Div([
     ], id="divergence-container")
     ], className="second-row")
 
-displaying_point_values_div = html.Div([
-    dcc.Markdown(children="Figures to display: ", id="logging-markdown", className="logging-markdown"),
-    html.Button("Trajectory (3D)", className="fig-button clicked", id="optim-3d-button"),
-    html.Button("Trajectory (Contour)", className="fig-button clicked", id="optim-contour-button"),
-    html.Button("Bregman Divergence", className="fig-button clicked", id="div-button"),
-    html.Button("Gradient Norm", className="fig-button clicked", id="grad-button"),
-    html.Button("Trajectory (Dual Space)", className="fig-button clicked", id="dual-button"),
-
-],id="hovered-values", className="log-container")
-
 experiment_figs = html.Div([displaying_point_values_div, graphs_row1, graphs_row2], id="experiment-output", className="experiment-graphs")
-
-
-# constructor functions 
-
-
-def construct_mini_settings(idx, init_x=0.5, init_y=0.5, iterations=100, lr=0.01, p1=0.2, p2=0.3, p3=0.5, Q="2, 0, 0, 1", bregman="EUCLID"):
-    return html.Div([
-        dcc.Markdown(f"**Algorithm parameters ({idx})**"),
-        html.Div([
-            html.Label("Initial value (X)"),
-            dcc.Input(type="number", value=init_x, style={"marginBottom": "5px"},
-                      className="input-values", id={"type": "initial-value-input", "index": idx}),
-        ], className="input-row", id={"type": "init-row", "index": idx}),
-        html.Div([
-            html.Label("Initial value (Y)"),
-            dcc.Input(type="number", value=init_y, style={"marginBottom": "5px"},
-                      className="input-values", id={"type": "initial-value-input-2", "index": idx}),
-        ], className="input-row", id={"type": "init-row-2", "index": idx}),
-        html.Div([
-            html.Label("Initial value (p1)"),
-            dcc.Input(type="number", value=p1, style={"marginBottom": "5px"},
-                      className="input-values", id={"type": "simplex-initial-value-input", "index": idx}),
-        ], className="input-row hidden", id={"type": "simplex-init-row", "index": idx}),
-        html.Div([
-            html.Label("Initial value (p2)"),
-            dcc.Input(type="number", value=p2, style={"marginBottom": "5px"},
-                      className="input-values", id={"type": "simplex-initial-value-input-2", "index": idx}),
-        ], className="input-row hidden", id={"type": "simplex-init-row-2", "index": idx}),
-        html.Div([
-            html.Label("Initial value (p3)"),
-            dcc.Input(type="number", value=p3, style={"marginBottom": "5px"},
-                      className="input-values", id={"type": "simplex-initial-value-input-3", "index": idx}),
-        ], className="input-row hidden", id={"type": "simplex-init-row-3", "index": idx}),
-        html.Div([
-            html.Label("Iterations"),
-            dcc.Input(type="number", value=iterations, style={"marginBottom": "5px"},
-                      className="input-values", id={"type": "number-iterations-input", "index": idx}),
-        ], className="input-row"),
-        html.Div([
-            html.Label("Learning Rate"),
-            dcc.Input(type="number", value=lr, step=0.001, min=0, style={"marginBottom": "5px"},
-                      className="input-values", id={"type": "lr-mini-input", "index": idx}),
-        ], className="input-row"),
-        html.Div([
-            html.Label("Bregman"),
-            dcc.Dropdown(
-                options=[
-                    {"label": "Euclidean", "value": "EUCLID"},
-                    {"label": "KL", "value": "KL"},
-                    {"label": "Mahalanobis", "value": "MAHALANOBIS"},
-                    {"label": "Itakura-Saito", "value": "ITAKURA-SAITO"},
-                    {"label": "Power-3", "value": "POWER3"},
-                    {"label": "Exponential", "value": "EXPONENTIAL"}
-                ],
-                value=bregman,
-                id={"type": "bregman-mini-input", "index": idx},
-                className="dropdown"
-            )
-        ], className="input-row"),
-        html.Div([
-            html.Label("Positive Definite Matrix"),
-            dcc.Input(type="text", value=Q, step=0.001, min=0, style={"marginBottom": "5px"},
-                      className="input-function", id={"type": "Q-input", "index": idx}),
-        ], className="input-row hidden", id={"type": "Q-input-row", "index": idx})
-    ], className="settings", id={"type": "minimise-settings", "index": idx})
-
 
 
 minimise_config = html.Div([html.Div([
@@ -248,6 +428,7 @@ minimise_config = html.Div([html.Div([
                 {"label": "Anisotropic", "value": "ANISO"},
                 {"label": "Cubic", "value": "CUBIC"},
                 {"label": "3D Simplex", "value": "SIMPLEX"},
+                {"label": "Itakura-based", "value": "ITAKURA"},
                 {"label": "Rosenbrock", "value": "ROSENBROCK"},
                 {"label": "Rastrigin", "value": "RASTRIGIN"},
                 {"label": "Booth", "value": "BOOTH"},
@@ -278,7 +459,7 @@ minimise_config = html.Div([html.Div([
     ], className="input-row hidden", id="optim-y-input-row"),
     html.Div([
         html.Label("Noise"),
-        dcc.Input(type="number", value=0.0, max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="noise-input")
+        dcc.Input(type="number", value=0.0, max=50, min=0, step=0.1, style={"marginBottom": "5px"}, className="input-values", id="noise-input")
     ], className="input-row hidden", id="noise-input-row"),
     html.Div([
         html.Label("Target q1"),
@@ -295,106 +476,14 @@ minimise_config = html.Div([html.Div([
     construct_mini_settings(1)
 ], className= "settings", id="inner-div")], id="minimise-config", className="option-columns-mlp")
 
-
-import re
-
-def construct_experiment_results(idx, metrics_dict):
-       # function converts the metrics_dict into a table
-    table_rows = []
-    for key, value in metrics_dict.items():
-        
-        if isinstance(value, list):
-            # skip arrays like step_sizes
-            continue
-        elif isinstance(value, float):
-            if abs(value) > 1e6:
-                display_value = f"{value:.3e}"
-            else:
-                display_value = f"{value:.5f}"
-            row_value = str(display_value)
-        else:
-            row_value = str(value)
-        table_rows.append(
-            html.Tr(
-                [
-                    html.Td(key, className="metric-name"),
-                    html.Td(row_value, className="metric-value")
-                ],
-                id={'type': 'metric-row', 'metric': key, 'table': idx},
-                n_clicks=0,
-                style={'cursor': 'pointer'}  # visually indicate that the row is clickable
-            )
-        )
-
-    return html.Div([
-        html.H4(f"Experiment {idx} results", className="experiment-header"),
-        html.Table(
-            className="metrics-table",
-            children=[html.Tbody(table_rows)]
-        )
-    ],
-    className="experiment-result animate-slide-in",
-    id={"type": "experiment-result", "index": idx})
-
-
-# callback determines which metrics have been selected for highlighting
-@callback(
-    Output("selected-metrics", "data"),
-    Input({'type': 'metric-row', 'metric': ALL, 'table': ALL}, 'n_clicks'),
-    State("selected-metrics", "data"),
-    prevent_initial_call=True,
-)
-def update_selected_metrics(n_clicks_list, selected_metrics):
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        raise PreventUpdate
-    
-    if all(n == 0 for n in n_clicks_list):
-        raise PreventUpdate
-    
-    triggered_id = json.loads(ctx.triggered[0]["prop_id"].split('.')[0])
-    metric = triggered_id['metric']
-
-    
-    if metric in selected_metrics:
-        selected_metrics.remove(metric)
-    else:
-        selected_metrics.append(metric)
-    return selected_metrics
-
-
-@callback(
-    Output({'type': 'metric-row', 'metric': ALL, 'table': ALL}, 'style'),
-    Input("selected-metrics", "data"),
-    State({'type': 'metric-row', 'metric': ALL, 'table': ALL}, 'id')
-)
-def update_metric_row_style(selectedMetrics, ids):
-    
-    if selectedMetrics is None:
-        selectedMetrics = []
-    
-    styles = []
-    
-    for idObj in ids:
-        
-        base_style = {"cursor": "pointer"}
-        
-        if idObj.get("metric") in selectedMetrics:
-            base_style["backgroundColor"] = "#a2bab2"
-        styles.append(base_style)
-    
-    return styles
-
-# placeholder variables to be updated via callback
-minimise_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-minimise")
+# configuration panel buttons
+minimise_run_button = html.Button("Run Experiment", className="run-button", n_clicks=0, id="run-button-minimise", disabled=False)
 minimise_add_button = html.Button("+", className="add-button", n_clicks=1, id="add-button-minimise", title="add a configuration")
 minimise_save_button = html.Button("Save", className="save-button", id="save-button-minimise", disabled=True, title="Cannot save until experiment has ran", n_clicks=0)
 minimise_remove_button = html.Button("-", className="add-button", id="remove-button-minimise", disabled=True, title="Must be at least one configuration", n_clicks=0)
-
-
-
 run_button_container = html.Div([minimise_run_button, minimise_add_button, minimise_remove_button, minimise_save_button], id="run-button-container")
 
+# metrics panel
 experiment_results = html.Div([
         html.H3("Metrics", id="metrics-header"),
         
@@ -403,6 +492,7 @@ experiment_results = html.Div([
 
 experiment_settings_type_store = dcc.Store(id="experiment-settings-type", data="minimise")
 
+# configuration panel 
 config_options = html.Div([
     dcc.Markdown("#### Configuration", className="markdown-config", id="config-title"),
     minimise_config,
@@ -431,17 +521,18 @@ mini_save_clicks_store = dcc.Store(id="mini-save-clicks", data=0)
 # stores the current number of approx/mini button clicks 
 global_min_clicks_store = dcc.Store(id="min-clicks", data=0)
 selected_metrics_store = dcc.Store(id="selected-metrics", data=[])
+
 # stores the currently inputted Q matrices as tensors for use in experiment callbacks
 Q_store = dcc.Store(id="Q-store", data=None)
 
-# Stores used for experiment callback chain
+# stores used for experiment callback chain
 current_experiment = dcc.Store(id="current-experiment", data=0)
 metrics = dcc.Store(id="metrics", data=[])
-trigger_next = dcc.Store(id="trigger-next", data=None)
 experiment_parameters = dcc.Store(id="experiment-params", data=None)
 experiment_dict = dcc.Store(id="experiment-dict", data=None)
 
-experiment_running = dcc.Store(id="experiment-running", data=False)
+# binary store indicating whether to disable the contour figure, set to true by experiment callbacks
+disable_contour_store = dcc.Store(id="disable-3d", data=False)
 
 # dim store 
 dim_store = dcc.Store(id="dim-store", data=1)
@@ -498,27 +589,22 @@ layout = html.Div([
     default_config_store,
     current_experiment,
     metrics,
-    trigger_next,
     experiment_parameters,
     experiment_dict,
-    experiment_running,
+    disable_contour_store,
     dcc.Interval(
         id='experiment-interval',
-        interval=2000,  # in milliseconds (1 second interval, adjust as needed)
+        interval=500,  # in milliseconds (1 second interval, adjust as needed)
         n_intervals=0,
         disabled=True  # Initially disabled
     ),
-    dcc.Interval(
-        id='logging-interval',
-        interval=2000,  # in milliseconds (1 second interval, adjust as needed)
-        n_intervals=0,
-        disabled=False  # Initially disabled
-    )
+    
     
 ], style={"padding": "5px 20px 20px 20px"})
 
 
-
+# CALLBACKS 
+# ----------------------------------------
 
 # callback highlights corresponding points on gradient, divergence and dual space traj graphs when hovering over a point
 # on the primal space traj graphs
@@ -566,6 +652,8 @@ def sync_hover_others(hover2d, hover3d, fig2d, fig3d, dual_fig, grad_fig, div_fi
     new_grad = remove_highlights(new_grad)
     new_div  = remove_highlights(new_div)
 
+
+    # lots of try/except blocks here as this callback was very error prone when developing
     if active_hover is None:
         return new_optim, new_dual, new_grad, new_div
 
@@ -604,6 +692,7 @@ def sync_hover_others(hover2d, hover3d, fig2d, fig3d, dual_fig, grad_fig, div_fi
     _, div_val  = get_corresponding_value(div_fig, exp_num, pt_index, return_hovertext=False)
 
     if div_val is not None:
+        # divergence can vary drastically depending on the configuration so selectively apply different levels of precision
         if div_val < 0.00001:
             div_string = f"Divergence: {div_val:.4e}<br>"
         else:
@@ -611,6 +700,7 @@ def sync_hover_others(hover2d, hover3d, fig2d, fig3d, dual_fig, grad_fig, div_fi
     else:
         div_string = ""
 
+    # the hovertext needs to be different for the simplex figure
     if preset_value == "SIMPLEX":
         if 'hovertext' in hovered_trace and isinstance(hovered_trace['hovertext'], list):
             optim_info = hovered_trace['hovertext'][pt_index]
@@ -622,7 +712,7 @@ def sync_hover_others(hover2d, hover3d, fig2d, fig3d, dual_fig, grad_fig, div_fi
             (f"Dual: ({dual_info})<br>" if dual_info is not None else "") +
             (f"Gradient: {grad_val:.2f}<br>" if grad_val is not None else "") +
             div_string +
-            f"Iteration: {pt_index + 1}" +
+            f"Iteration: {pt_index}" +
             "<extra></extra>"
         )
     else:
@@ -632,7 +722,7 @@ def sync_hover_others(hover2d, hover3d, fig2d, fig3d, dual_fig, grad_fig, div_fi
             (f"Dual: ({dual_x:.2f}, {dual_y:.2f})<br>" if dual_x is not None and dual_y is not None else "") +
             (f"Gradient: {grad_val:.2f}<br>" if grad_val is not None else "") +
             div_string +
-            f"Iteration: {pt_index + 1}" +
+            f"Iteration: {pt_index}" +
             "<extra></extra>"
         )
 
@@ -659,11 +749,12 @@ def sync_hover_others(hover2d, hover3d, fig2d, fig3d, dual_fig, grad_fig, div_fi
     Output("function-mini-input", "value"),
     Input("preset-function-input", "value"),
     Input("config-options", "children"),
+    State("function-mini-input", "value"),
     prevent_initial_call=True
 )
-def add_preset_variable_inputs(preset_function, children):
+def add_preset_variable_inputs(preset_function, children, obj_string):
     if preset_function == "ANISO":
-        return ["input-row"]*5 + ["input-row hidden"]*3 + ["a*(x - optx)**2 + b*(y-opty)"]
+        return ["input-row"]*5 + ["input-row hidden"]*3 + ["a*(x - optx)**2 + b*(y-opty)**2"]
     elif preset_function == "SIMPLEX":
         return ["input-row hidden"]*4 + ["input-row"] + ["input-row"]*3 + ["sum(q * log(q / p))"]
     elif preset_function == "ROSENBROCK":
@@ -675,11 +766,17 @@ def add_preset_variable_inputs(preset_function, children):
     elif preset_function == "ACKLEY":
         return ["input-row hidden"]*4 + ["input-row"] + ["input-row hidden"]*3 + ["-20*e(-0.2*sqrt(0.5*(x**2 + y**2))) - e(0.5*(cos(2*pi*x) + cos(2*pi*y))) + e + 20"]
     elif preset_function == "CUSTOM":
-        return ["input-row hidden"]*5 + ["input-row hidden"]*3 + ["X**2 + Y**2"]
+        if obj_string != "X**2 + Y**2":
+            func = obj_string
+        else: 
+            func = "X**2 + Y**2"
+        return ["input-row hidden"]*5 + ["input-row hidden"]*3 + [func]
     elif preset_function == "EXPONENTIAL":
         return ["input-row hidden"]*2 + ["input-row"]*3 + ["input-row hidden"]*3 + ["e*(x-optx) - (x - optx) + e(y - opty) - (y - opty)"]
     elif preset_function == "CUBIC":
         return ["input-row hidden"]*2 + ["input-row"]*3 + ["input-row hidden"]*3 + ["1/3 * (|x - optx|**3 + |y - opty|**3)"]
+    elif preset_function == "ITAKURA":
+        return ["input-row"] + ["input-row hidden"]*3 + ["input-row"] + ["input-row hidden"]*3 + ["a/(x*y) - log(a/(x*y)) - 1"]
     else:
         return no_update
 
@@ -762,6 +859,17 @@ def update_configuration_mini(n_clicks_add, n_clicks_remove, current_children, n
 
     return no_update
 
+# disables/enables the add configuration button dependent on whether num experiments < 5 or not
+@callback(
+    Output("add-button-minimise", "disabled"),
+    Input("num-experiments-min", "data")
+)
+def disable_add(num_experiments):
+    if num_experiments < 5:
+        return False
+    else:
+        return True
+
 @callback(
     Output("remove-button-minimise", "disabled"),
     Input("num-experiments-min", "data")
@@ -810,8 +918,6 @@ def manage_bregman_options(current_dim, num_experiments):
             {"label": "KL", "value": "KL"},
             {"label": "Mahalanobis", "value": "MAHALANOBIS"},
             {"label": "Itakura-Saito", "value": "ITAKURA-SAITO"},
-            {"label": "Power-3", "value": "POWER3"},
-            {"label": "Exponential", "value": "EXPONENTIAL"}
         ]
     if current_dim == 1:
         for opt in base_options:
@@ -822,7 +928,7 @@ def manage_bregman_options(current_dim, num_experiments):
 
 
 
-# callback to add input field for positive definite matrix Q when mahalanobis distance is selected
+# callback to show/hide input field for positive definite matrix Q when mahalanobis distance is selected
 # also sets default value of Q to correct dims depending on the problem selected - 3x3 for simplex or 2x2 for 2D functions
 @callback(
     Output({"type": "Q-input-row", "index": ALL}, "className"),
@@ -949,8 +1055,6 @@ def update_upload_prompt(filename):
 )
 def download_minimise_experiment(n_clicks_min, experiment_data_min):
     # triggers a download upon save button being clicked
-    # have to store n_clicks in a global dcc.store in order to compare to the save buttons value
-    # as this callback gets triggered when the user adds a configuration due to the save button reloading 
     ctx = callback_context
     if not ctx.triggered:
         return no_update
@@ -967,81 +1071,6 @@ def download_minimise_experiment(n_clicks_min, experiment_data_min):
     
 
 
-# builds a matching minimise-configuration from the saved json
-def build_minimise_config_from_saved(saved_state):
-    experiments = saved_state.get("experiments", {})
-    metrics = saved_state.get("metrics", {})
-    metric_configs = []
-    experiment_configs = []
-    for i in range(len(experiments)):
-        exp = experiments.get(f"experiment-{i+1}")
-        config =  construct_mini_settings(i+1,exp.get("initial_value_x"),exp.get("initial_value_y"),exp.get("iterations"),exp.get("learning_rate"),exp.get("p1"),exp.get("p2"),exp.get("p3"),exp.get("Q"),exp.get("bregman"))
-        if i == 0:
-            experiment_configs.append(config)
-        else:
-            experiment_configs.append(html.Div(config, id=f"new-settings-{i+1}", className="option-columns-mlp"))
-        
-    for i in range(len(experiments)):
-        metric = metrics.get(f"experiment-{i+1}-metrics", {})
-        metric_configs.append(construct_experiment_results(i+1, metric))
-    minimise_config = html.Div([html.Div([
-    dcc.Markdown("**Objective function and algorithm parameters**"),
-    html.Div([
-        html.Label("Objective Function"),
-        dcc.Input(type="text", value=saved_state["configuration"].get("function", ""), style={"marginBottom": "5px"}, className="input-function", id="function-mini-input"),
-    ], className="input-row"),
-    html.Div([
-        html.Label("Function Presets"),
-        dcc.Dropdown(
-            options=[
-                {"label": "Custom", "value": "CUSTOM"},
-                {"label": "Anisotropic", "value": "ANISO"},
-                {"label": "Cubic", "value": "CUBIC"},
-                {"label": "3D Simplex", "value": "SIMPLEX"},
-                {"label": "Rosenbrock", "value": "ROSENBROCK"},
-                {"label": "Rastrigin", "value": "RASTRIGIN"},
-                {"label": "Booth", "value": "BOOTH"},
-                {"label": "Ackley", "value": "ACKLEY"},
-                {"label": "Exponential", "value": "EXPONENTIAL"},
-            ]   
-        , id="preset-function-input",className="dropdown", value=saved_state["configuration"].get("function_preset", ""))
-    ], className = "input-row"),
-    html.Div([
-        html.Label("Variable (a)"),
-        dcc.Input(type="number", value=saved_state["configuration"].get("var_a"), style={"marginBottom": "5px"}, className="input-values", id="a-input")
-    ], className="input-row hidden", id="a-input-row"),
-    html.Div([
-        html.Label("Variable (B)"),
-        dcc.Input(type="number", value=saved_state["configuration"].get("var_b"), style={"marginBottom": "5px"}, className="input-values", id="b-input")
-    ], className="input-row hidden", id="b-input-row"),
-    html.Div([
-        html.Label("Optimum (x)"),
-        dcc.Input(type="number", value=saved_state["configuration"].get("opt_x"), style={"marginBottom": "5px"}, className="input-values", id="optim-x-input")
-    ], className="input-row hidden", id="optim-x-input-row"),
-    html.Div([
-        html.Label("Optimum (y)"),
-        dcc.Input(type="number", value=saved_state["configuration"].get("opt_y"), style={"marginBottom": "5px"}, className="input-values", id="optim-y-input")
-    ], className="input-row hidden", id="optim-y-input-row"),
-    html.Div([
-        html.Label("Noise"),
-        dcc.Input(type="number", value=saved_state["configuration"].get("noise"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="noise-input")
-    ], className="input-row hidden", id="noise-input-row"),
-    html.Div([
-        html.Label("Target q1"),
-        dcc.Input(type="number", value=saved_state["configuration"].get("q1"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q1-input")
-    ], className="input-row hidden", id="q1-input-row"),
-    html.Div([
-        html.Label("Target q2"),
-        dcc.Input(type="number", value=saved_state["configuration"].get("q2"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q2-input")
-    ], className="input-row hidden", id="q2-input-row"),
-    html.Div([
-        html.Label("Target q3"),
-        dcc.Input(type="number", value=saved_state["configuration"].get("q3"), max=1, min=0, step=0.01, style={"marginBottom": "5px"}, className="input-values", id="q3-input")
-    ], className="input-row hidden", id="q3-input-row"),
-    experiment_configs[0]]
-    , className= "settings", id="inner-div")], id="minimise-config", className="option-columns-mlp")
-    full_config = [minimise_config] + experiment_configs[1:]
-    return full_config, metric_configs
 
 
 # updates which figures are currently being displayed as per the users choice by applying/removing the "true-hidden" class
@@ -1071,32 +1100,30 @@ def build_minimise_config_from_saved(saved_state):
     State("divergence-container", "className"),
     State("grad-container", "className"),
     State("dual-container", "className"),
+    State("dim-store", "data")
 )
 def update_displayed_figures(o3d_clicks, o_clicks, div_clicks, grad_clicks, dual_clicks,
                              o3d_btn_class, o_btn_class, div_btn_class, grad_btn_class, dual_btn_class,
-                             o3d_cont_class, o_cont_class, div_cont_class, grad_cont_class, dual_cont_class):
+                             o3d_cont_class, o_cont_class, div_cont_class, grad_cont_class, dual_cont_class, dim_store):
     ctx = callback_context
     if not ctx.triggered:
         return no_update
 
-    # Helper to safely convert a value to a string we can work with.
+    # safely converts a value to a string to work with
     def safe_class(val):
         if val is no_update or val is None:
             return "animate-slide-in"
         return val
 
-    # Prepare output lists for button and container classes.
-    # Order: Buttons: optim-3d, optim-contour, div, grad, dual
-    #        Containers: optim-3d, optim, divergence, grad, dual
     btn_classes = [no_update] * 5
     cont_classes = [no_update] * 5
 
-    # Toggle logic for each button/container pair.
+    
     triggered_prop = ctx.triggered[0]["prop_id"]
 
-    # Optim-3d (first row, first container)
+    # optim-3d figure
     if triggered_prop == "optim-3d-button.n_clicks":
-        if o3d_btn_class == "fig-button clicked":
+        if o3d_btn_class == "fig-button clicked" or dim_store == 1:
             btn_classes[0] = "fig-button"
             cont_classes[0] = "animate-slide-in true-hidden"
         else:
@@ -1106,7 +1133,7 @@ def update_displayed_figures(o3d_clicks, o_clicks, div_clicks, grad_clicks, dual
         btn_classes[0] = o3d_btn_class
         cont_classes[0] = o3d_cont_class
 
-    # Optim-contour (first row, second container)
+    # optim contour figure
     if triggered_prop == "optim-contour-button.n_clicks":
         if o_btn_class == "fig-button clicked":
             btn_classes[1] = "fig-button"
@@ -1118,7 +1145,7 @@ def update_displayed_figures(o3d_clicks, o_clicks, div_clicks, grad_clicks, dual
         btn_classes[1] = o_btn_class
         cont_classes[1] = o_cont_class
 
-    # Div (second row, first container)
+    # divergence figure
     if triggered_prop == "div-button.n_clicks":
         if div_btn_class == "fig-button clicked":
             btn_classes[2] = "fig-button"
@@ -1130,7 +1157,7 @@ def update_displayed_figures(o3d_clicks, o_clicks, div_clicks, grad_clicks, dual
         btn_classes[2] = div_btn_class
         cont_classes[2] = div_cont_class
 
-    # Grad (second row, second container)
+    # gradient figure
     if triggered_prop == "grad-button.n_clicks":
         if grad_btn_class == "fig-button clicked":
             btn_classes[3] = "fig-button"
@@ -1142,7 +1169,7 @@ def update_displayed_figures(o3d_clicks, o_clicks, div_clicks, grad_clicks, dual
         btn_classes[3] = grad_btn_class
         cont_classes[3] = grad_cont_class
 
-    # Dual (second row, third container)
+    # dual space figure
     if triggered_prop == "dual-button.n_clicks":
         if dual_btn_class == "fig-button clicked":
             btn_classes[4] = "fig-button"
@@ -1154,19 +1181,20 @@ def update_displayed_figures(o3d_clicks, o_clicks, div_clicks, grad_clicks, dual
         btn_classes[4] = dual_btn_class
         cont_classes[4] = dual_cont_class
 
-    # --- SOLO LOGIC: Update first row (optim-3d-container and optim-container) ---
+    # if any of the figures are on their own in their respective row, adds/removes a "solo" class which decreases the width 
+    # so figures arent stretched to fill the row
     first_row_indexes = [0, 1]
-    # Remove any "solo" substring first
     for i in first_row_indexes:
         cont_classes[i] = safe_class(cont_classes[i]).replace(" solo", "")
-    # Determine visible containers (not containing "true-hidden")
+
+    # determine visible containers in first row
     first_row_visibles = [1 if "true-hidden" not in safe_class(cont_classes[i]).split() else 0 for i in first_row_indexes]
     if sum(first_row_visibles) == 1:
         for i in first_row_indexes:
             if "true-hidden" not in safe_class(cont_classes[i]).split():
                 cont_classes[i] = safe_class(cont_classes[i]) + " solo"
 
-    # --- SOLO LOGIC: Update second row (divergence, grad, dual containers) ---
+    # same for second row
     second_row_indexes = [2, 3, 4]
     for i in second_row_indexes:
         cont_classes[i] = safe_class(cont_classes[i]).replace(" solo", "")
@@ -1187,11 +1215,29 @@ def update_displayed_figures(o3d_clicks, o_clicks, div_clicks, grad_clicks, dual
             cont_classes[3],
             cont_classes[4])
 
+# disables 3d graph if function is 1d
+@callback(
+    Output("optim-3d-button", "className", allow_duplicate=True),
+    Output("optim-3d-button", "disabled", allow_duplicate=True),
+    Output("optim-3d-container", "className", allow_duplicate=True),
+    Output("optim-container", "className", allow_duplicate=True),
+    Input("disable-3d", "data"),
+    prevent_initial_call=True
+)
+def disable_3d_fig(disable):
+    ctx = callback_context
+    if not ctx.triggered:
+        return no_update
+    if disable:
+        return "fig-button", True, "animate-slide-in true-hidden", "animate-slide-in solo"
+    else:
+        return "fig-button clicked", False, "animate-slide-in", "animate-slide-in"
+
+
 
 # clientside callback to make the figures themselves invisible when the containers are changing size due to added/removed figures
 # from the above callback
 # necessary as the figures take about half a second longer to change size than the containers, so it looks jittery and messy without this
-
 clientside_callback(
     """
     function(optim3dContClass, optimContClass, divContClass, gradContClass, dualContClass) {
@@ -1208,7 +1254,7 @@ clientside_callback(
             if (graphElem) {
                 // add "transitioning" class to hide the figure
                 graphElem.classList.add("transitioning");
-                // Remove the 'transitioning' class after 600ms so that the plot fades in
+                // remove the 'transitioning' class after 600ms so that the plot fades in
                 setTimeout(function() {
                     graphElem.classList.remove("transitioning");
                 }, 800);
@@ -1229,6 +1275,7 @@ clientside_callback(
 @callback(
     Output("config-options", "children", allow_duplicate=True),
     Output("optimisation-path-fig", "figure", allow_duplicate=True),
+    Output("optimisation-path-fig-3d", "figure", allow_duplicate=True),
     Output("dual-fig", "figure", allow_duplicate=True),
     Output("gradient-fig", "figure", allow_duplicate=True),
     Output("divergence-fig", "figure", allow_duplicate=True),
@@ -1239,40 +1286,51 @@ clientside_callback(
     Output("minimise-config", "className", allow_duplicate=True),
     Output("experiment-metrics", "className", allow_duplicate=True),
     Input("upload-load", "n_clicks"),
+    Input("preset-load", "n_clicks"),
     State("upload-config", "contents"),
     State("upload-config", "filename"),
     State("config-options", "children"),
     State("experiment-metrics", "children"),
+    State("preset-dropdown", "value"),
     prevent_initial_call=True
 )
-def load_experiment(load_clicks, contents, filename, current_children, current_children_metrics):
+def load_experiment(load_clicks, preset_load_clicks, contents, filename, current_children, current_children_metrics, preset_dropdown):
     
     triggered = callback_context.triggered
     if not triggered:
-        return no_update
+        raise PreventUpdate
     
     triggered_id = triggered[0]["prop_id"]
-    if triggered_id != "upload-load.n_clicks" or load_clicks == 0:
-        return no_update, no_update
+    if (triggered_id != "upload-load.n_clicks" and triggered_id != "preset-load.n_clicks") or (load_clicks == 0 and preset_load_clicks == 0):
+        raise PreventUpdate
+    
+
     
     print("Loading Experiment...")
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
-    saved_experiment = json.loads(decoded.decode("utf-8"))
+    if triggered_id == "preset-load.n_clicks":
+        saved_experiment = config_dict[preset_dropdown]
+    
+    else:
+
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        saved_experiment = json.loads(decoded.decode("utf-8"))
 
     num_experiments = len(saved_experiment.get("experiments", {}))
     if saved_experiment["configuration"].get("experiment_type") == "minimise":
-
+        print("?")
         minimise_config_new, metrics = build_minimise_config_from_saved(saved_experiment)
         print("minimise config len ", len(minimise_config_new))
-        new_children = current_children[:1] + minimise_config_new + [current_children[-1]]
+        new_children = current_children[:1] + minimise_config_new + current_children[-2:]
 
         new_experiment_results = build_experiment_results_from_saved(saved_experiment, "minimise")
         new_metrics = [current_children_metrics[0]] + metrics + [current_children_metrics[-1]]
 
-        return new_children, new_experiment_results[0], new_experiment_results[1], new_experiment_results[2], new_experiment_results[3],new_metrics, num_experiments, num_experiments, "minimise", "option-columns-mlp", "experiment-metrics"
+        return new_children, new_experiment_results[0], new_experiment_results[1], new_experiment_results[2], new_experiment_results[3], new_experiment_results[4],new_metrics, num_experiments, num_experiments, "minimise", "option-columns-mlp", "experiment-metrics"
 
 
+# callback initialises a run of experiment configurations. This callback initialises all experiment parameters and runs the first experiment.
+# after completion it enables the experiment-interval which calls run_next_experiment
 @callback(
     Output("experiment-interval", "disabled", allow_duplicate=True),
     Output("current-experiment", "data", allow_duplicate=True),
@@ -1288,6 +1346,7 @@ def load_experiment(load_clicks, contents, filename, current_children, current_c
     Output("experiment-metrics", "className", allow_duplicate=True),
     Output("run-button-minimise", "n_clicks"),
     Output("run-button-minimise", "disabled", allow_duplicate=True), 
+    Output("disable-3d", "data"),
     Input("run-button-minimise", "n_clicks"),
     State("function-mini-input", "value"),
     State({"type": "initial-value-input", "index": ALL}, "value"),
@@ -1312,6 +1371,7 @@ def load_experiment(load_clicks, contents, filename, current_children, current_c
     State("preset-function-input", "value"),
     State("experiment-metrics", "children"),
     State({"type": "Q-input", "index": ALL}, "value"),
+    State("optimisation-path-fig-3d", "figure"),
     running=[Output("run-button-minimise", "disabled"), True, True],
     prevent_initial_call=True,
     allow_duplicate=True,
@@ -1320,11 +1380,18 @@ def load_experiment(load_clicks, contents, filename, current_children, current_c
 def initialise_experiment_run(n_clicks, objective_string, init_x, init_y, iter,
                             lr, bregman, num_experiments, second_input_bool, q_store,
                             p1s, p2s, p3s, q1, q2, q3, a, b, optx, opty, noise_std,
-                            preset_function, current_metrics, q_strings):
+                            preset_function, current_metrics, q_strings, current3dfig):
     print("init experiment ran")
+    ctx = callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+    # every time the configuration panel is reloaded, the run-button is also reloaded causing this callback to trigger even if button has not been pressed
+    # hence checking for n_clicks to see if callback has definitely been triggered by the user
     if n_clicks != 0:
         inits, dim = setup_inits(preset_function, second_input_bool, init_x, init_y, p1s, p2s, p3s)
         objective = get_objective_function(preset_function, objective_string, a, b, q1, q2, q3, optx, opty, noise_std=noise_std)
+
+        # get the optimum its coords from the objective class if its a preset function, if not then set these to None
         if preset_function != "CUSTOM":
             optimum = objective(objective.optimum)
             optimum_coords = objective.optimum
@@ -1332,19 +1399,32 @@ def initialise_experiment_run(n_clicks, objective_string, init_x, init_y, iter,
         else:
             optimum, optimum_coords = None, None
 
+        # initialising the experiment class
         experiment = ExperimentMD(objective, bregman=bregman[0], Q=torch.tensor(q_store[0][0], dtype=torch.float64),
                                    Q_inv=torch.tensor(q_store[0][1], dtype=torch.float64), x_star=optimum_coords, f_star=optimum, dim=dim)
         
+        # clear trajectories from the graph object for a new set of experiments
+        graph.trajectories = []
+        
+        # running the experiment and constructing figures and metrics
         experiment.run_experiment_minimise(inits[0], iter[0], float(lr[0]))
         metrics = experiment.gather_metrics()
         metrics_div = construct_experiment_results(1, metrics)
         optimisation_path_fig = graph.create_optimisation_path_graph(experiment.minimisation_guesses, experiment.objective, dim)
-        optimisation_path_fig3d = graph.create_optimisation_path_3d_graph(experiment.minimisation_guesses, experiment.objective, dim)
+
+        # for the 1d custom function case, disable the 3d graph
+        if dim != 1:
+            disable_3d = False
+            optimisation_path_fig3d = graph.create_optimisation_path_3d_graph(experiment.minimisation_guesses, experiment.objective, dim)
+        else:
+            disable_3d = True
+            optimisation_path_fig3d = current3dfig
 
         gradient_fig = graph.create_gradient_norm_graph(experiment.gradient_logs)
         divergence_fig = graph.create_divergence_graph(experiment.avg_divergence_logs)
         dual_fig = graph.create_dual_space_trajectory_graph(experiment.optimiser.logs["dual"],experiment.objective, dim)
 
+        # create a dictionary of the experiment parameters to pass to run_next_experiment
         experiments_dict = create_experiment_dict_min(num_experiments, init_x, init_y, iter, lr, bregman, second_input_bool, q_strings, p1s, p2s, p3s)
         experiment_params = {
             "inits": inits,
@@ -1357,48 +1437,18 @@ def initialise_experiment_run(n_clicks, objective_string, init_x, init_y, iter,
             "learning_rate": lr
         }
         
+        # get rid of any old metrics tables and replace with the first table of metrics from this first experiment configuration
         new_metrics_children = [current_metrics[0]] + [metrics_div] + [current_metrics[-1]]
-    
+
+        # enable the interval to call run_next_experiment
         interval_disabled = False
         next_experiment = 2
-        return (interval_disabled, next_experiment, [metrics], experiment_params, experiments_dict, optimisation_path_fig, optimisation_path_fig3d, dual_fig, divergence_fig, gradient_fig, new_metrics_children, "experiment-metrics", 0, no_update)
+        return (interval_disabled, next_experiment, [metrics], experiment_params, experiments_dict, optimisation_path_fig, optimisation_path_fig3d, dual_fig, divergence_fig, gradient_fig, new_metrics_children, "experiment-metrics", 0, no_update, disable_3d)
     else:
-        return [no_update]*13 + [False]
+        return [no_update]*13 + [False] + [no_update]
 
-def construct_experiment_state(metrics_dict, experiment_config_dict, experiment_params, figures):
-    experiment_state = {
-            "configuration": {
-                "experiment_type": "minimise",  
-                "function": experiment_params[1], 
-                "function_preset": experiment_params[0],
-                "var_a": experiment_params[2],
-                "var_b": experiment_params[3],
-                "opt_x": experiment_params[7],
-                "opt_y": experiment_params[8],
-                "noise": experiment_params[9],
-                "q1": experiment_params[4],
-                "q2": experiment_params[5],
-                "q3": experiment_params[6]     
-            },
-            "experiments": experiment_config_dict,
-            "metrics": metrics_dict,
-            "figures": {
-                "optim_fig": pio.to_json(figures[0]),
-                "optim_fig_3d": pio.to_json(figures[1]),
-                "dual_optim_fig": pio.to_json(figures[2]),
-                "gradient_fig": pio.to_json(figures[3]),
-                "divergence_fig": pio.to_json(figures[4]),
-            }
-    }
-    return experiment_state
 
-current_exp_number = 1
-@callback(
-    Input("current-experiment", "data"),
-)
-def update_expnumber(current_experiment):
-    print("do I ever run")
-    current_exp_number = current_experiment
+
 
 @callback(
     Output("experiment-interval", "disabled", allow_duplicate=True),
@@ -1428,7 +1478,9 @@ def update_expnumber(current_experiment):
     State("Q-store", "data"),
     State("experiment-metrics", "children"),
     State("experiment-interval", "disabled"),
-    running=[(Output("experiment-interval", "disabled"), True, False), (Output("run-button-minimise", "disabled"), True, True)],
+    # disable the experiment-interval while the callback is running, otherwise it can cause an infinite loop if callback
+    #  is triggered again before the previous experiemnt has fi nished
+    running=[(Output("experiment-interval", "disabled"), True, False), (Output("run-button-minimise", "disabled"), True, True)], 
     suppress_callback_exceptions=True,
     prevent_initial_call=True,
 )
@@ -1436,39 +1488,56 @@ def run_next_experiment(triggered, current_experiment, params, metrics,  num_exp
                         optimisation_path_fig, optimisation_path_fig_3d, dual_fig, divergence_fig, gradient_fig,
                         q_store, current_metrics_div, interval_disabled):
     print("run next experiment ran")
-    print(triggered)
-    print(interval_disabled)
+    # checks if the interval has actually triggered
     if triggered == 0:
-        print("check123")
-        return [no_update]*10
+        return [no_update]*13
     
     if current_experiment > num_experiments:
-        print("check1")
+        # disable the interval now that the final experiment has ran
         interval_disabled = True
+        # creates multiple experiment dicts as well as final figures for each experiment completed in this looping callback
         metrics_dict = create_compiled_metrics_dicts(num_experiments, metrics)
         figures = [optimisation_path_fig, optimisation_path_fig_3d, dual_fig, divergence_fig, gradient_fig]
         experiment_state = construct_experiment_state(metrics_dict, experiment_dict, params["objective_params"], figures)
-        print("check2")
+        print("All experiments complete and configurations ready for saving")
         return (interval_disabled, no_update, None, no_update, no_update, no_update, no_update, no_update, no_update, no_update, experiment_state, False, False)
       
     else:
         time1 = time.time()
+        # gather all params from dict
         inits, dim, iter = params["inits"], params["dim"], params["iter"]
         optimum, optimum_coords = params["optimum"], params["optimum_coords"]
+
+        # optimum gets converted back to a scalar rather than a tensor when stored in a dcc.Store component so must convert back
+        if optimum is not None: 
+            optimum = torch.tensor(optimum, dtype=torch.float64)
         bregman, lr = params["bregman"], params["learning_rate"]
         obj_params = params["objective_params"]
-        objective = get_objective_function(*obj_params)
+        objective = get_objective_function(obj_params[0], obj_params[1], obj_params[2], obj_params[3], obj_params[4], obj_params[5], obj_params[6] ,obj_params[7], obj_params[8], noise_std=obj_params[9]) 
+
+        # run next experiment with corresponding params
         exp_idx = current_experiment-1
         experiment = ExperimentMD(objective, bregman=bregman[exp_idx], Q=torch.tensor(q_store[exp_idx][0], dtype=torch.float64),
                                   Q_inv = torch.tensor(q_store[exp_idx][1], dtype=torch.float64), x_star=optimum_coords, f_star=optimum, dim=dim)
         experiment.run_experiment_minimise(inits[exp_idx], iter[exp_idx], float(lr[exp_idx]))
+        g_time1  =time.time()
+
+        # generate figures
         optimisation_path_fig, optimisation_path_fig_3d, gradient_fig, divergence_fig, dual_fig = graph.update_all_graphs_min(experiment.minimisation_guesses, experiment.gradient_logs,
                                                                                                      experiment.avg_divergence_logs, experiment.optimiser.logs["dual"],
                                                                                                      experiment.objective, current_experiment, dim=dim)
+        if dim == 1:
+            optimisation_path_fig_3d = no_update
+            # dont update the 3d figure for 1d objectives
+        g_time2 = time.time()
+        print("time taken to construct graphs: ", g_time2 - g_time1)
+
+        # calculate metrics and construct the table div
         new_metrics = experiment.gather_metrics()
         new_metrics_div = construct_experiment_results(current_experiment, new_metrics)
         metrics.append(new_metrics)
         
+        # insert the new metrics div after all of the previous experiment results
         metrics_div = Patch()
         metrics_div.insert(-1, new_metrics_div)
         time2 =time.time()
@@ -1477,7 +1546,7 @@ def run_next_experiment(triggered, current_experiment, params, metrics,  num_exp
         print(f"Next experiment number:  ({current_experiment})")
         return no_update, current_experiment, metrics, optimisation_path_fig, optimisation_path_fig_3d, dual_fig, divergence_fig, gradient_fig, metrics_div, "experiment-metrics", no_update, no_update, no_update
     
-#
+
 #callback loads a base experiment when the page initialises
 @callback(
     Output("config-options", "children", allow_duplicate=True),

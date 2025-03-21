@@ -1,7 +1,7 @@
 import plotly.graph_objects as plotly 
 import numpy as np
 import torch 
-
+from scipy.interpolate import griddata
 class Graphs(): 
     # Class for constructing and updating graphs
     # all methods starting with "create" contain the initial constructing of a graph
@@ -16,61 +16,6 @@ class Graphs():
             5 : "#E6C229",
         }
         self.trajectories = [] 
-
-    
-    def create_loss_curve(self, loss_logs):
-        self.loss_curve_graph = plotly.Figure()
-        self.loss_curve_graph.add_trace(plotly.Scatter(
-            x=list(range(len(loss_logs))),
-            y=loss_logs,
-            mode="lines",
-            opacity=0.7,
-            line=dict(color=self.line_colors[1]),
-            name="1"
-        ))
-        self.loss_curve_graph.update_layout(
-            title="Loss curve",
-            xaxis_title="Epochs",
-            yaxis_title="Loss",
-            template="plotly_white",
-            font=dict(
-                family="Roboto",
-                color="black"
-            ),
-            plot_bgcolor="#f2e9dd",
-            paper_bgcolor="#f2e9dd"
-        )
-        self.loss_curve_graph.update_yaxes(
-            type="log"
-        )
-        self.loss_curve_graph.update_xaxes(
-        gridcolor= "#e8dac5",
-        linecolor= "#322634",
-        zerolinecolor="#e8dac5"
-        )
-
-        self.loss_curve_graph.update_yaxes(
-            gridcolor= "#e8dac5",
-            linecolor= "#322634",
-            zerolinecolor="#e8dac5"
-
-        )
-        return self.loss_curve_graph 
-    
-   
-    def add_loss_curve(self, loss_logs, exp_number): 
-        if self.loss_curve_graph is not None: 
-            self.loss_curve_graph.add_trace(plotly.Scatter(
-            x=list(range(len(loss_logs))),
-            y = loss_logs,
-            mode="lines",
-            opacity=0.7,
-            line=dict(color=self.line_colors[exp_number]),
-            name=f'{exp_number}'
-            )) 
-            return self.loss_curve_graph
-        else: 
-            raise ValueError("loss graph does not exist.")
 
     def create_gradient_norm_graph(self, gradient_logs):
         xaxis="Iteration"
@@ -110,6 +55,7 @@ class Graphs():
             zerolinecolor="#e8dac5"
 
         )
+        print("constructed gradient figure")
         return self.gradient_norm_graph
     
     def add_gradient_norm(self, gradient_logs, exp_number):
@@ -122,6 +68,7 @@ class Graphs():
             line=dict(color=self.line_colors[exp_number]),
             name=f'{exp_number}'
             )) 
+            print("added to gradient figure")
             return self.gradient_norm_graph
         else: 
             raise ValueError("gradient norm graph does not exist.")
@@ -165,6 +112,7 @@ class Graphs():
             zerolinecolor="#e8dac5"
 
         )
+        print("constructed divergence figure")
         return self.divergence_graph 
     
     def add_divergence(self, divergence_logs, exp_number): 
@@ -177,77 +125,11 @@ class Graphs():
             line=dict(color=self.line_colors[exp_number]),
             name=f'{exp_number}'
             )) 
+            print("added to divergence figure")
             return self.divergence_graph
         else: 
             raise ValueError("divergence graph does not exist.")
         
-    
-    def create_function_approximation_plot(self, prediction_data):
-        self.approximation_graph = plotly.Figure()
-        self.approximation_graph.add_trace(plotly.Scatter(
-            x=prediction_data['X'],
-            y=prediction_data['Y_true'],
-            mode='lines',
-            name='True Function',
-            line=dict(color="black")
-        ))
-        self.approximation_graph.add_trace(plotly.Scatter(
-            x=prediction_data['X'],
-            y=prediction_data['Y_pred'],
-            mode='markers+lines',
-            name='1',
-            opacity=0.5,
-            line=dict(color=self.line_colors[1]),
-            marker=dict(size=2, opacity=0.5)
-        ))
-        self.approximation_graph.update_layout(
-            title='Function Approximation',
-            xaxis_title='Input',
-            yaxis_title='Output',
-            template="plotly_white",
-            font=dict(
-                family="Roboto",
-                color="black"
-            ),
-            legend=dict(
-            orientation="h",   
-            yanchor="bottom",  
-            y=1.02,             
-            xanchor="right",   
-            x=1,
-            ),
-            plot_bgcolor="#f2e9dd",
-            paper_bgcolor="#f2e9dd"  
-        )
-        self.approximation_graph.update_xaxes(
-            gridcolor= "#e8dac5",
-            linecolor= "#322634",
-            zerolinecolor="#e8dac5"
-        )
-
-        self.approximation_graph.update_yaxes(
-            gridcolor= "#e8dac5",
-            linecolor= "#322634",
-            zerolinecolor="#e8dac5"
-
-        )
-        return self.approximation_graph 
-    
-    def add_function_approximation(self, prediction_data, exp_number): 
-        if self.approximation_graph is not None: 
-            self.approximation_graph.add_trace(plotly.Scatter(
-            x=prediction_data['X'],
-            y=prediction_data['Y_pred'],
-            mode='markers+lines',
-            name=f'{exp_number}',
-            opacity=0.5,
-            line=dict(color=self.line_colors[exp_number]),
-            marker=dict(size=2, opacity=0.5)
-        ))
-            return self.approximation_graph
-        else: 
-            raise ValueError("approximation graph does not exist.")
-    
     def barycentric_to_cartesian(self,p):
         # p is a list/array of three elements (p1, p2, p3) with p1+p2+p3=1
         # using vertices: a=(0,0), b=(1,0), c=(0.5, sqrt(3)/2)
@@ -305,7 +187,7 @@ class Graphs():
                 
             ))
             self.optimisation_path_graph.update_layout(
-                title = 'Primal Space Optimisation Trajectory (Contour)',
+                title = 'Primal Space Optimisation Trajectory (2D / 1D)',
                 xaxis_title = 'x',
                 yaxis_title = 'f(x)',
                 font = dict(family="roboto", color="black"),
@@ -340,9 +222,20 @@ class Graphs():
             x_range = np.linspace(x_bounds[0], x_bounds[1], 200)
             y_range = np.linspace(y_bounds[0], y_bounds[1], 200)
             X, Y = np.meshgrid(x_range, y_range)
-            Z = np.array([[objective(*torch.tensor([x, y], dtype=torch.float32)).item() 
-                            for x, y in zip(x_row, y_row)] 
-                        for x_row, y_row in zip(X, Y)])
+            X_tensor = torch.tensor(X, dtype=torch.float32)
+            Y_tensor = torch.tensor(Y, dtype=torch.float32)
+
+            Z_tensor = objective(X_tensor, Y_tensor)
+            Z = Z_tensor.detach().numpy()
+            
+            # if function shoots to infinity at some point (like with the itakura-based objective)
+            # then need to clip the Z values or no contours will be visible
+            zmin = np.nanmin(Z)
+            zmax = np.nanmax(Z)
+            if zmax > 40000:
+                threshold = zmin + 0.0001 * (zmax - zmin)
+                Z = np.clip(Z, zmin, threshold)
+
             self.optimisation_path_graph.add_trace(plotly.Contour(
                 x = x_range,
                 y = y_range,
@@ -364,7 +257,7 @@ class Graphs():
                 name = "(1)",
             ))
             self.optimisation_path_graph.update_layout(
-                title = 'Primal Space Optimisation Trajectory (Contour)',
+                title = 'Primal Space Optimisation Trajectory (2D / 1D)',
                 xaxis_title = 'x',
                 yaxis_title = 'y',
                 template = "plotly_white",
@@ -375,31 +268,49 @@ class Graphs():
                 margin=dict(l=5, r=10, t=80, b=5)
             )
         
+            
+        
         elif dim == 3:
             # for simplex problems (3d), first create a static contour
+            # make u,v axes and grid
             u = np.linspace(0, 1, 100)
             v = np.linspace(0, 1, 100)
             U, V = np.meshgrid(u, v)
+
+            # only keep points lying on the simplex
             mask = U + V <= 1
+
+            #barycentric coordinates p1, p2, p3
             p1 = U[mask]
             p2 = V[mask]
             p3 = 1 - p1 - p2
+
+            # convert to cartesian coordinates
             points_cart = np.array([self.barycentric_to_cartesian([p1_val, p2_val, p3_val])
                                     for p1_val, p2_val, p3_val in zip(p1, p2, p3)])
+            # get x and y values
             xi = points_cart[:, 0]
             yi = points_cart[:, 1]
+
+            # create the meshgrid for contour and then go through the objective values
             z_scatter = np.array([objective(torch.tensor([p1_val, p2_val, p3_val], dtype=torch.float32)).item()
                                 for p1_val, p2_val, p3_val in zip(p1, p2, p3)])
-            from scipy.interpolate import griddata
+            
             x_grid = np.linspace(xi.min(), xi.max(), 200)
             y_grid = np.linspace(yi.min(), yi.max(), 200)
             XI, YI = np.meshgrid(x_grid, y_grid)
+
             ZI = griddata((xi, yi), z_scatter, (XI, YI), method='linear')
+            # filter out nan values
             valid_Z = ZI[~np.isnan(ZI)]
+
+            # clip any extreme values as the simplex objective has extremely high values around the edge of the simplex
             zmin = valid_Z.min()
             zmax = valid_Z.max()
             threshold = zmin + 0.2 * (zmax - zmin)
             ZI_clipped = np.clip(ZI, zmin, threshold)
+
+            # set the number of contours and add the contour trace
             n_contours = 20
             contour_step = (threshold - zmin) / n_contours
             self.optimisation_path_graph = plotly.Figure()
@@ -473,7 +384,7 @@ class Graphs():
                     font = dict(color="black", size=12)
                 ))
             self.optimisation_path_graph.update_layout(
-                title = 'Primal Space Optimisation Trajectory (Contour)',
+                title = 'Primal Space Optimisation Trajectory (2D / 1D)',
                 xaxis_title = '',
                 yaxis_title = '',
                 template = "plotly_white",
@@ -494,7 +405,7 @@ class Graphs():
                 linecolor = "#322634",
                 zerolinecolor = "#e8dac5"
             )
-        
+        print("Constructed 2D contour figure")
         return self.optimisation_path_graph
     
     def add_optimisation_path(self, minimisation_guesses, objective, exp_number, dim):
@@ -545,11 +456,14 @@ class Graphs():
                 hovertemplate="%{hovertext}"
             ))
             # update the contour plot for the simplex if needed
-            
+        print("Added to 2D contour figure")
         return self.optimisation_path_graph
 
     def create_optimisation_path_3d_graph(self, minimisation_guesses, objective, dim):
         # create a 3d graph for the optimisation trajectory
+
+        if dim == 1: 
+            return None
         if dim == 2:
             # for 2d problems, compute x, y and objective value as z
             x_vals = [p[0] for p in minimisation_guesses]
@@ -561,10 +475,17 @@ class Graphs():
             x_range = np.linspace(x_bounds[0], x_bounds[1], 200)
             y_range = np.linspace(y_bounds[0], y_bounds[1], 200)
             X, Y = np.meshgrid(x_range, y_range)
-            Z = np.array([
-                [objective(*torch.tensor([xi, yi], dtype=torch.float32)).item() for xi, yi in zip(x_row, y_row)]
-                for x_row, y_row in zip(X, Y)
-            ])
+            X_tensor = torch.tensor(X, dtype=torch.float32)
+            Y_tensor = torch.tensor(Y, dtype=torch.float32)
+
+            Z_tensor = objective(X_tensor, Y_tensor)
+            Z = Z_tensor.detach().numpy()
+            zmin = np.nanmin(Z)
+            zmax = np.nanmax(Z)
+            if zmax > 40000:
+                threshold = zmin + 0.0001 * (zmax - zmin)
+                Z = np.clip(Z, zmin, threshold)
+
             # create the figure and add the surface and trajectory traces
             self.optimisation_path_graph3d = plotly.Figure()
             self.optimisation_path_graph3d.add_trace(plotly.Surface(
@@ -633,6 +554,7 @@ class Graphs():
                 }
 
             )
+        print("3D figure constructed")
         return self.optimisation_path_graph3d
 
     def add_optimisation_path_3d(self, minimisation_guesses, objective, exp_number, dim):
@@ -659,8 +581,16 @@ class Graphs():
             x_range = np.linspace(x_bounds[0], x_bounds[1], 200)
             y_range = np.linspace(y_bounds[0], y_bounds[1], 200)
             X, Y = np.meshgrid(x_range, y_range)
-            Z = np.array([[objective(*torch.tensor([xi, yi], dtype=torch.float32)).item() 
-                            for xi in x_range] for yi in y_range])
+            X_tensor = torch.tensor(X, dtype=torch.float32)
+            Y_tensor = torch.tensor(Y, dtype=torch.float32)
+
+            Z_tensor = objective(X_tensor, Y_tensor)
+            Z = Z_tensor.detach().numpy()
+            zmin = np.nanmin(Z)
+            zmax = np.nanmax(Z)
+            if zmax > 40000:
+                threshold = zmin + 0.0001 * (zmax - zmin)
+                Z = np.clip(Z, zmin, threshold)
 
             # update the existing surface to account for new trajectory
             self.optimisation_path_graph3d.data[0].update(x=X, y=Y, z=Z)
@@ -689,10 +619,13 @@ class Graphs():
                 line=dict(color=self.line_colors[exp_number], width=2),
                 name=f"({exp_number})"
             ))
+
+        elif dim == 1:
+            return None
+        print("added to 3d figure")
         return self.optimisation_path_graph3d
     def create_dual_space_trajectory_graph(self, dual_logs, objective, dim):
         self.dual_space_graph = plotly.Figure()
-        print("dual logs (first 10):", dual_logs[:10])
         
         if dim == 1:
             x_vals = [point for point in dual_logs]
@@ -746,7 +679,8 @@ class Graphs():
                 ),
                 paper_bgcolor="#f2e9dd",
                 font=dict(family="roboto", color="black"),
-                legend = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                legend = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                margin=dict(l=5, r=10, t=80, b=5)
             )
 
             return self.dual_space_graph
@@ -770,6 +704,7 @@ class Graphs():
             linecolor="#322634",
             zerolinecolor="#e8dac5"
         )
+        print("constructed dual space figure")
         return self.dual_space_graph
     
     def add_dual_space_trajectory(self, dual_logs, exp_number, dim):
@@ -816,7 +751,7 @@ class Graphs():
             ))
             
     
-        
+        print("added to dual space figure")
         return self.dual_space_graph
     
     def create_interactive_bregman_graph(self, x, y):
@@ -951,9 +886,9 @@ class Graphs():
 
         # ensuring non-zero range
         if x_min == x_max:
-            x_min, x_max = default_range
+            x_min, x_max = x_min - 1, x_max + 1
         if y_min == y_max:
-            y_min, y_max = default_range
+            y_min, y_max = y_min - 1, y_max + 1
         
         padding_x = (x_max - x_min) * padding_ratio
         padding_y = (y_max - y_min) * padding_ratio
@@ -968,7 +903,17 @@ class Graphs():
 
         X, Y = np.meshgrid(x_range, y_range)
 
-        Z = np.array([[objective(torch.tensor(x), torch.tensor(y)) for x, y in zip(X_row, Y_row)] for X_row, Y_row in zip(X, Y)])
+        X_tensor = torch.tensor(X, dtype=torch.float32)
+        Y_tensor = torch.tensor(Y, dtype=torch.float32)
+
+        Z_tensor = objective(X_tensor, Y_tensor)
+        Z = Z_tensor.detach().numpy()
+        zmin = np.nanmin(Z)
+        zmax = np.nanmax(Z)
+        if zmax > 40000:
+            threshold = zmin + 0.0001 * (zmax - zmin)
+            Z = np.clip(Z, zmin, threshold)
+
 
         self.optimisation_path_graph.data[0].update(x=x_range, y=y_range, z=Z)
         

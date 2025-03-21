@@ -12,6 +12,8 @@ import plotly.io as pio
 from dash.long_callback import DiskcacheManager
 import diskcache
 from dash import DiskcacheManager
+
+# might potentially be useful once the app is deployed
 cache = diskcache.Cache("./cache")
 background_callback_manager = DiskcacheManager(cache)
 app = dash.Dash(__name__, use_pages=True, suppress_callback_exceptions=True, background_callback_manager=background_callback_manager)
@@ -39,7 +41,7 @@ app.index_string = """
 
 app.layout = html.Div([
     dcc.Location(id="url", refresh=False),
-    html.H1("Mirror Descent Optimisation Toolkit",
+    html.H1("Mirror Descent Playground",
             className="headers"),
     html.Div([
         html.Div(

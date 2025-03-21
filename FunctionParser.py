@@ -15,7 +15,7 @@ class FunctionParser():
             "exp": torch.exp,
             "sqrt": torch.sqrt,
             "log": torch.log,
-            "pi": torch.tensor(torch.pi)  
+            "pi": torch.tensor(torch.pi),
         }
         
         # check the string can be parsed as an expression

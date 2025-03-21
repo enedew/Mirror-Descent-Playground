@@ -1,63 +1,31 @@
 import torch
 from torch.optim import Optimizer 
 
-# defining some matrix Q for mahalanobis distance 
-Q = torch.tensor([[10, 0.0],
-                  [0.0, 1.0]])
-Q_inv = torch.tensor([[0.1, 0.0],
-                      [0.0, 1.0]])
-
-# dictionary of mirror maps for different bregman divergences 
-mirror_map_dict = { 
-    # domain R^n
-    'EUCLID' : lambda x: x,
-    'MAHALANOBIS': lambda x: torch.matmul(Q, x),
-    # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
-    'KL' : lambda x: torch.log(x + 1e-8)+1,
-    'ITAKURA-SAITO': lambda x: -1.0/x,
-    "POWER3": lambda x: torch.sign(x) * torch.pow(torch.abs(x), 2),
-    'EXPONENTIAL': lambda x: torch.exp(x)
-} 
-
-# dictionary of inverse mirror maps for different bregman divergences 
-
-inv_mirror_map_dict = {
-    'EUCLID' : lambda x: x,
-    'MAHALANOBIS': lambda x: torch.matmul(Q_inv, x),
-    'KL' : lambda x: torch.exp(x-1),
-    'ITAKURA-SAITO': lambda x: -1.0/x,
-    'POWER3': lambda x: torch.sign(x) * torch.sqrt(torch.abs(x)),
-    'EXPONENTIAL': lambda x: torch.log(x)
-
-}
-
 
 class MirrorDescent(Optimizer):
     def __init__(self, params, lr=0.01, bregman='EUCLID',
                 Q = torch.tensor([[10, 0.0], [0.0, 1.0]]),
                 Q_inv=torch.tensor([[0.1,0.0], [0.0, 1.0]]), logs=True):
+        
+        # small epsilon term for kl and itakura mirror maps, prevents log(0) or 1/0
+        eps = 1e-8
+
         # set the mirror map and its inverse to the corresponding functions 
         self.mirror_map_dict = { 
             # domain R^n
             'EUCLID' : lambda x: x,
             'MAHALANOBIS': lambda x: torch.matmul(Q, x),
             # domain x > 0 (probabilities) s.t. sum(x) = 1 (ideally)
-            'KL' : lambda x: torch.log(x)+1,
-            'ITAKURA-SAITO': lambda x: -1.0/x,
-            "POWER3": lambda x: torch.sign(x) * torch.pow(torch.abs(x), 2),
-            'EXPONENTIAL': lambda x: torch.exp(x)
+            'KL' : lambda x: torch.log(x + eps),
+            'ITAKURA-SAITO': lambda x: -1.0/(x + eps),
         } 
 
         # dictionary of inverse mirror maps for different bregman divergences 
-
         self.inv_mirror_map_dict = {
             'EUCLID' : lambda x: x,
             'MAHALANOBIS': lambda x: torch.matmul(Q_inv, x),
-            'KL' : lambda x: torch.exp(x-1),
-            'ITAKURA-SAITO': lambda x: -1.0/x,
-            'POWER3': lambda x: torch.sign(x) * torch.sqrt(torch.abs(x)),
-            'EXPONENTIAL': lambda x: torch.log(x)
-
+            'KL' : lambda x: torch.exp(x)  - eps ,
+            'ITAKURA-SAITO': lambda x: -1.0/x - eps,
         }
         self.grad_psi = self.mirror_map_dict[bregman]
         self.inv_grad_psi = self.inv_mirror_map_dict[bregman]
