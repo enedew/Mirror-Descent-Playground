@@ -4,20 +4,14 @@ from dash import dcc, html, Input, Output, callback_context, no_update, callback
 import plotly.express as px
 from Graphs import Graphs
 from Experiment import ExperimentMD
-from dash.long_callback import DiskcacheLongCallbackManager
 import torch
 import time
 from experiment_utils import setup_inits, get_objective_function, create_compiled_metrics_dicts, create_experiment_dict_min, construct_experiment_results
 import plotly.io as pio 
-from dash.long_callback import DiskcacheManager
-import diskcache
-from dash import DiskcacheManager
 
 # might potentially be useful once the app is deployed
-cache = diskcache.Cache("./cache")
-background_callback_manager = DiskcacheManager(cache)
-app = dash.Dash(__name__, use_pages=True, suppress_callback_exceptions=True, background_callback_manager=background_callback_manager)
-
+app = dash.Dash(__name__, use_pages=True, suppress_callback_exceptions=True)
+server = app.server
 app.index_string = """
 <!DOCTYPE html>
 <html>
@@ -67,4 +61,4 @@ def update_navbar(pathname):
     return links
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    app.run(debug=True)

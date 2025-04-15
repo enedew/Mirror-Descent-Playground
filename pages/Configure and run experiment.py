@@ -859,6 +859,54 @@ def update_configuration_mini(n_clicks_add, n_clicks_remove, current_children, n
 
     return no_update
 
+# callback determines which metrics have been selected for highlighting
+@callback(
+    Output("selected-metrics", "data"),
+    Input({'type': 'metric-row', 'metric': ALL, 'table': ALL}, 'n_clicks'),
+    State("selected-metrics", "data"),
+    prevent_initial_call=True,
+)
+def update_selected_metrics(n_clicks_list, selected_metrics):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+    
+    if all(n == 0 for n in n_clicks_list):
+        raise PreventUpdate
+    
+    triggered_id = json.loads(ctx.triggered[0]["prop_id"].split('.')[0])
+    metric = triggered_id['metric']
+
+    
+    if metric in selected_metrics:
+        selected_metrics.remove(metric)
+    else:
+        selected_metrics.append(metric)
+    return selected_metrics
+
+
+@callback(
+    Output({'type': 'metric-row', 'metric': ALL, 'table': ALL}, 'style'),
+    Input("selected-metrics", "data"),
+    State({'type': 'metric-row', 'metric': ALL, 'table': ALL}, 'id')
+)
+def update_metric_row_style(selectedMetrics, ids):
+    
+    if selectedMetrics is None:
+        selectedMetrics = []
+    
+    styles = []
+    
+    for idObj in ids:
+        
+        base_style = {"cursor": "pointer"}
+        
+        if idObj.get("metric") in selectedMetrics:
+            base_style["backgroundColor"] = "#a2bab2"
+        styles.append(base_style)
+    
+    return styles
+
 # disables/enables the add configuration button dependent on whether num experiments < 5 or not
 @callback(
     Output("add-button-minimise", "disabled"),
